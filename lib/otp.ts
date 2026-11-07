@@ -18,6 +18,14 @@ const ipLimiter = new SlidingWindowLimiter(20, 60 * 60 * 1000);
 const hashOtp = (email: string, purpose: OtpPurpose, code: string) =>
   hmacSha256Hex(env.sessionSecret(), `otp:${purpose}:${email}:${code}`);
 
+/**
+ * Temporary switch while building on localhost: OTP_BYPASS="true" lets signup skip the
+ * code check. Always off in production, so a live site can never skip verification.
+ */
+export function otpBypassed(): boolean {
+  return process.env.OTP_BYPASS === "true" && process.env.NODE_ENV !== "production";
+}
+
 export type OtpResult = { ok: true } | { ok: false; error: string };
 /** `devCode` is only present on localhost without a real email service (see emailIsSimulated). */
 export type IssueOtpResult = { ok: true; devCode?: string } | { ok: false; error: string };

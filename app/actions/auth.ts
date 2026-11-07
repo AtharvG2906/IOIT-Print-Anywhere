@@ -8,7 +8,7 @@ import { env } from "@/lib/env";
 import { sendWelcomeEmail } from "@/lib/email";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { createSession, destroySession, hashPassword, isAdminUser, verifyPassword } from "@/lib/auth";
-import { issueOtp, verifyOtp } from "@/lib/otp";
+import { issueOtp, otpBypassed, verifyOtp } from "@/lib/otp";
 import { fieldErrors, normalizePrn, passwordSchema, signupSchema, type SignupInput } from "@/lib/validation";
 
 const RESET_COOKIE = "pa_reset";
@@ -66,15 +66,18 @@ export async function createAccount(_prev: FormState, formData: FormData): Promi
 
   const parsed = signupSchema.safeParse(raw);
   const errors = parsed.success ? {} : fieldErrors(parsed.error);
-  if (!otp) errors.otp = "Click “Send OTP” and enter the 6-digit code from your email.";
+  const bypass = otpBypassed();
+  if (!otp && !bypass) errors.otp = "Click “Send OTP” and enter the 6-digit code from your email.";
   if (!parsed.success || errors.otp) return { errors, values };
 
   const data = parsed.data;
   const taken = await findTakenFields(data);
   if (Object.keys(taken).length) return { errors: taken, values };
 
-  const result = await verifyOtp(data.email, "SIGNUP", otp);
-  if (!result.ok) return { errors: { otp: result.error }, values };
+  if (!bypass) {
+    const result = await verifyOtp(data.email, "SIGNUP", otp);
+    if (!result.ok) return { errors: { otp: result.error }, values };
+  }
 
   let user;
   try {

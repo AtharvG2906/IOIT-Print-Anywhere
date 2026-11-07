@@ -7,14 +7,14 @@ import { Alert, Field, inputClass, secondaryButtonClass } from "@/components/ui"
 import { SubmitButton } from "@/components/SubmitButton";
 import { DevOtpNotice } from "@/components/DevOtpNotice";
 
-export function SignupForm() {
+export function SignupForm({ otpBypass = false }: { otpBypass?: boolean }) {
   const [state, action] = useActionState<FormState, FormData>(createAccount, {});
   const e = state.errors ?? {};
   const v = state.values ?? {};
 
   // Email OTP: the code is tied to the address it was sent to.
   const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
+  const [otp, setOtp] = useState(otpBypass ? "000000" : "");
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [sentFor, setSentFor] = useState<string | null>(null);
   const [otpError, setOtpError] = useState<string | null>(null);
@@ -106,7 +106,7 @@ export function SignupForm() {
             label="Email address"
             htmlFor="email"
             error={e.email ?? (!sentTo ? (otpError ?? undefined) : undefined)}
-            hint="We'll email you a code to verify it. Print updates are sent here too."
+            hint={otpBypass ? "Print updates are sent here." : "We'll email you a code to verify it. Print updates are sent here too."}
           >
             <div className="flex gap-2">
               <input
@@ -119,6 +119,7 @@ export function SignupForm() {
                 className={inputClass}
                 required
               />
+              {!otpBypass && (
               <button
                 type="button"
                 onClick={sendOtp}
@@ -127,16 +128,21 @@ export function SignupForm() {
               >
                 {sendLabel}
               </button>
+              )}
             </div>
           </Field>
         </div>
 
-        {sentTo && (
+        {(sentTo || otpBypass) && (
           <div className="sm:col-span-2">
             <Field label="Email OTP" htmlFor="otp" error={otpFieldError}>
-              <p className="mb-2 text-xs text-emerald-700">
-                Code sent to <b>{sentTo}</b>. Check your inbox (and spam). It expires in 5 minutes.
-              </p>
+              {otpBypass ? (
+                <p className="mb-2 text-xs text-amber-700">OTP check is turned off for now — any number works.</p>
+              ) : (
+                <p className="mb-2 text-xs text-emerald-700">
+                  Code sent to <b>{sentTo}</b>. Check your inbox (and spam). It expires in 5 minutes.
+                </p>
+              )}
               <input
                 id="otp"
                 name="otp"
@@ -147,7 +153,7 @@ export function SignupForm() {
                 onChange={(ev) => setOtp(ev.target.value.replace(/\D/g, ""))}
                 placeholder="6-digit code"
                 className={`${inputClass} max-w-[220px] text-center font-mono text-xl tracking-[0.4em]`}
-                autoFocus
+                autoFocus={!otpBypass}
               />
             </Field>
             {devCode && (

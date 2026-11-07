@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { otpBypassed } from "@/lib/otp";
 import { Card, PageTitle } from "@/components/ui";
 import { SignupForm } from "./SignupForm";
 import { Steps } from "@/components/SignupSteps";
@@ -19,7 +20,7 @@ export default async function SignupPage() {
         }
       />
       <Card>
-        <SignupForm />
+        <SignupForm otpBypass={otpBypassed()} />
       </Card>
     </div>
   );
