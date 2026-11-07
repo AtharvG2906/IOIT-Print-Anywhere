@@ -50,7 +50,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-screen flex-col">
         <Header />
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
-        <footer className="py-6 text-center text-xs text-stone-500">IOIT Print Anywhere · A4 · Black &amp; white</footer>
+        <footer className="space-y-1 py-6 text-center text-xs text-stone-500">
+          <p>IOIT Print Anywhere · A4 · Black &amp; white</p>
+          <p>
+            Made with ❤️ by{" "}
+            <a
+              href="https://linktr.ee/atharvgadekar"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-stone-700 underline underline-offset-2 hover:text-stone-900"
+            >
+              Atharv Gadekar
+            </a>
+          </p>
+        </footer>
       </body>
     </html>
   );
