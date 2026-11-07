@@ -1,10 +1,10 @@
-# Installs the Print Anywhere agent as a Windows service that starts on boot.
+# Installs the IOIT Print Anywhere agent as a Windows service that starts on boot.
 # Run in an *Administrator* PowerShell from this folder:
 #   powershell -ExecutionPolicy Bypass -File .\install-service.ps1
 # Requires NSSM (https://nssm.cc) — e.g. `winget install nssm` — and Node.js 20+.
 
 param(
-  [string]$ServiceName = "PrintAnywhereAgent",
+  [string]$ServiceName = "IOITPrintAnywhereAgent",
   [string]$Nssm = "nssm"
 )
 
@@ -21,8 +21,8 @@ New-Item -ItemType Directory -Force -Path (Join-Path $here "logs") | Out-Null
 
 & $Nssm install $ServiceName $node (Join-Path $here "agent.mjs")
 & $Nssm set $ServiceName AppDirectory $here
-& $Nssm set $ServiceName DisplayName "Print Anywhere Agent"
-& $Nssm set $ServiceName Description "Prints paid Print Anywhere orders automatically."
+& $Nssm set $ServiceName DisplayName "IOIT Print Anywhere Agent"
+& $Nssm set $ServiceName Description "Prints paid IOIT Print Anywhere orders automatically."
 & $Nssm set $ServiceName Start SERVICE_AUTO_START
 & $Nssm set $ServiceName AppStdout (Join-Path $here "logs\agent.log")
 & $Nssm set $ServiceName AppStderr (Join-Path $here "logs\agent.log")

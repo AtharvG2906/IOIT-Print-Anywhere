@@ -1,8 +1,8 @@
 {
-  "name": "print-anywhere-agent",
+  "name": "ioit-print-anywhere-agent",
   "version": "1.0.0",
   "private": true,
-  "description": "Windows print agent for Print Anywhere",
+  "description": "Windows print agent for IOIT Print Anywhere",
   "type": "module",
   "engines": { "node": ">=20" },
   "scripts": {

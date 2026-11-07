@@ -1,4 +1,4 @@
-# Print Anywhere
+# IOIT Print Anywhere
 
 Students upload a PDF, choose a page range and up to 10 copies (**A4, black & white, ₹1/page**),
 and pay the exact amount with **Razorpay** (a fixed-amount UPI QR, or Checkout).

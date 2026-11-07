@@ -1,4 +1,4 @@
-# Print Anywhere — Windows print agent
+# IOIT Print Anywhere — Windows print agent
 
 Runs on the Windows PC connected to the printer. Every few seconds it asks the server for paid orders.
 For each order it prints the **cover sheet** (name, PRN, printing code) and then the **document**,
@@ -13,7 +13,7 @@ The agent only makes outgoing HTTPS requests, so you don't need port forwarding 
 2. Install **SumatraPDF** from <https://www.sumatrapdfreader.org> (the default install path is fine).
 3. Install the printer driver and print a Windows test page.
    Then set the printer's default paper size to **A4** in *Printing Preferences*.
-4. Copy this `agent` folder to the PC, for example to `C:\PrintAnywhere\agent`.
+4. Copy this `agent` folder to the PC, for example to `C:\IOITPrintAnywhere\agent`.
 5. Copy `agent.config.example.json` to `agent.config.json` and fill it in:
    - `serverUrl`: your site, for example `https://print.yourcollege.in`
    - `apiKey`: the `AGENT_API_KEY` value from the server's environment
@@ -22,7 +22,7 @@ The agent only makes outgoing HTTPS requests, so you don't need port forwarding 
    - `sumatraPath`: change it only if SumatraPDF is installed somewhere else
 6. Do a test run first with `"dryRun": true`:
    ```
-   cd C:\PrintAnywhere\agent
+   cd C:\IOITPrintAnywhere\agent
    node agent.mjs
    ```
    Place a test order. The agent logs the exact SumatraPDF commands without printing anything.
@@ -38,9 +38,9 @@ powershell -ExecutionPolicy Bypass -File .\install-service.ps1
 
 Logs are written to `logs\agent.log`. If the log says `printer not found`, the service account can't
 see the printer. Run the service as the Windows user that installed the printer:
-`nssm set PrintAnywhereAgent ObjectName .\YourUser YourPassword`, then `nssm restart PrintAnywhereAgent`.
+`nssm set IOITPrintAnywhereAgent ObjectName .\YourUser YourPassword`, then `nssm restart IOITPrintAnywhereAgent`.
 
-Alternative without NSSM: create a Task Scheduler task that runs `node C:\PrintAnywhere\agent\agent.mjs`
+Alternative without NSSM: create a Task Scheduler task that runs `node C:\IOITPrintAnywhere\agent\agent.mjs`
 **at log on** for the desk user, with "restart on failure" enabled.
 
 ## What happens to a job

@@ -7,8 +7,8 @@ describe("emails", () => {
     expect(m.subject).toContain("482913");
     expect(m.text).toContain("482913");
     expect(m.html).toContain("482913");
-    expect(m.text).toContain("create your Print Anywhere account");
-    expect(buildOtpEmail("a@b.com", "111111", "RESET").text).toContain("reset your Print Anywhere password");
+    expect(m.text).toContain("create your IOIT Print Anywhere account");
+    expect(buildOtpEmail("a@b.com", "111111", "RESET").text).toContain("reset your IOIT Print Anywhere password");
   });
 
   it("welcome email greets the student and escapes HTML", () => {

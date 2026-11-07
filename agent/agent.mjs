@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Print Anywhere — Windows print agent.
+// IOIT Print Anywhere — Windows print agent.
 // Polls the server for paid orders, prints the cover sheet + document with SumatraPDF
 // (A4, black & white, page range, copies), waits for the Windows print queue to finish,
 // then reports the order as ready. No dependencies; needs Node.js 20+.
@@ -24,7 +24,7 @@ const cfg = {
   pollSeconds: Number(config.pollSeconds ?? 5),
   heartbeatSeconds: Number(config.heartbeatSeconds ?? 10),
   queueTimeoutMinutes: Number(config.queueTimeoutMinutes ?? 120),
-  tempDir: String(config.tempDir ?? path.join(os.tmpdir(), "print-anywhere")),
+  tempDir: String(config.tempDir ?? path.join(os.tmpdir(), "ioit-print-anywhere")),
   // Dry run logs the print commands instead of printing. Always on outside Windows.
   dryRun: Boolean(config.dryRun) || process.platform !== "win32",
 };
@@ -194,7 +194,7 @@ async function processJob(job) {
 }
 
 async function main() {
-  log(`Print Anywhere agent "${cfg.agentId}" → ${cfg.serverUrl}${cfg.dryRun ? " (DRY RUN — nothing will print)" : ` printer "${cfg.printerName}"`}`);
+  log(`IOIT Print Anywhere agent "${cfg.agentId}" → ${cfg.serverUrl}${cfg.dryRun ? " (DRY RUN — nothing will print)" : ` printer "${cfg.printerName}"`}`);
   await heartbeat();
   const hb = setInterval(heartbeat, cfg.heartbeatSeconds * 1000);
 

@@ -26,7 +26,7 @@ export async function createFixedAmountQr(orderId: string, amountPaise: number, 
   // The SDK's typings lag behind the API, so build the payload loosely.
   const payload = {
     type: "upi_qr",
-    name: "Print Anywhere",
+    name: "IOIT Print Anywhere",
     usage: "single_use",
     fixed_amount: true,
     payment_amount: amountPaise,

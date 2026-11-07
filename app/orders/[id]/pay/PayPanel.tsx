@@ -71,7 +71,7 @@ export function PayPanel(p: Props) {
       amount: p.amountPaise,
       currency: "INR",
       order_id: p.razorpayOrderId,
-      name: "Print Anywhere",
+      name: "IOIT Print Anywhere",
       description: p.description,
       prefill: p.prefill,
       theme: { color: "#1c1917" },

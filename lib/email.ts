@@ -12,7 +12,7 @@ async function send(mail: Mail): Promise<void> {
   if (provider === "resend") {
     const resend = new Resend(process.env.RESEND_API_KEY);
     const { error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM ?? "Print Anywhere <onboarding@resend.dev>",
+      from: process.env.EMAIL_FROM ?? "IOIT Print Anywhere <onboarding@resend.dev>",
       to: mail.to,
       subject: mail.subject,
       html: mail.html,
@@ -41,7 +41,7 @@ function layout(title: string, body: string) {
   return `<!doctype html><html><body style="font-family:Arial,sans-serif;background:#f5f5f4;padding:24px">
   <div style="max-width:480px;margin:auto;background:#fff;border-radius:12px;padding:28px">
   <h2 style="margin:0 0 16px">${title}</h2>${body}
-  <p style="color:#78716c;font-size:12px;margin-top:28px">Print Anywhere</p></div></body></html>`;
+  <p style="color:#78716c;font-size:12px;margin-top:28px">IOIT Print Anywhere</p></div></body></html>`;
 }
 
 function codeBlock(code: string) {
@@ -51,10 +51,10 @@ function codeBlock(code: string) {
 // ---------- Account emails ----------
 
 export function buildOtpEmail(to: string, code: string, purpose: "SIGNUP" | "RESET"): Mail {
-  const action = purpose === "SIGNUP" ? "create your Print Anywhere account" : "reset your Print Anywhere password";
+  const action = purpose === "SIGNUP" ? "create your IOIT Print Anywhere account" : "reset your IOIT Print Anywhere password";
   return {
     to,
-    subject: `${code} is your Print Anywhere verification code`,
+    subject: `${code} is your IOIT Print Anywhere verification code`,
     text: `Use this code to ${action}: ${code}\n\nIt expires in 5 minutes. If you didn't ask for it, you can ignore this email.`,
     html: layout(
       "Your verification code",
@@ -73,11 +73,11 @@ type WelcomeMail = { to: string; name: string; prn: string; department: string; 
 export function buildWelcomeEmail(w: WelcomeMail): Mail {
   return {
     to: w.to,
-    subject: "Welcome to Print Anywhere 🎉",
-    text: `Hi ${w.name},\n\nYour Print Anywhere account is ready (PRN ${w.prn}, ${w.department}).\n\nHow it works:\n1. Upload a photo of your college ID (once).\n2. Upload a PDF, choose pages and copies (A4, black & white).\n3. Pay with UPI — you'll get a printing code.\n4. We email you when it's ready. Show the code and your college ID at the desk.\n\nLog in any time with your email or PRN: ${w.appUrl}/login`,
+    subject: "Welcome to IOIT Print Anywhere 🎉",
+    text: `Hi ${w.name},\n\nYour IOIT Print Anywhere account is ready (PRN ${w.prn}, ${w.department}).\n\nHow it works:\n1. Upload a photo of your college ID (once).\n2. Upload a PDF, choose pages and copies (A4, black & white).\n3. Pay with UPI — you'll get a printing code.\n4. We email you when it's ready. Show the code and your college ID at the desk.\n\nLog in any time with your email or PRN: ${w.appUrl}/login`,
     html: layout(
       `Welcome, ${escapeHtml(w.name.split(" ")[0])}!`,
-      `<p>Your Print Anywhere account is ready.</p>
+      `<p>Your IOIT Print Anywhere account is ready.</p>
       <p style="background:#f5f5f4;border-radius:8px;padding:10px 14px;font-size:14px">PRN <b>${escapeHtml(w.prn)}</b> · ${escapeHtml(w.department)}</p>
       <p><b>How it works</b></p>
       <ol style="padding-left:20px;line-height:1.7">

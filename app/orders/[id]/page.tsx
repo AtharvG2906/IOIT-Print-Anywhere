@@ -39,7 +39,7 @@ export default async function OrderPage({ params }: PageProps<"/orders/[id]">) {
               {order.status === "READY"
                 ? "Your prints are ready! Show this code and your college ID card at the desk."
                 : order.status === "COLLECTED"
-                  ? "Collected. Thanks for using Print Anywhere."
+                  ? "Collected. Thanks for using IOIT Print Anywhere."
                   : order.status === "FAILED"
                     ? "Something went wrong while printing. Please show this code at the desk."
                     : "We'll email you as soon as your prints are ready. Bring your college ID card."}

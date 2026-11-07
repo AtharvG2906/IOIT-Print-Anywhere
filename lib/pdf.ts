@@ -79,7 +79,7 @@ function winAnsi(text: string): string {
 /** Builds the A4 cover sheet printed in front of every order. */
 export async function buildCoverPage(d: CoverDetails): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
-  doc.setTitle(`Print Anywhere ${d.printingCode}`);
+  doc.setTitle(`IOIT Print Anywhere ${d.printingCode}`);
   const page = doc.addPage([A4_WIDTH, A4_HEIGHT]);
   const regular = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -93,7 +93,7 @@ export async function buildCoverPage(d: CoverDetails): Promise<Uint8Array> {
     p.drawText(t, { x: (A4_WIDTH - w) / 2, y, size, font, color });
   };
 
-  center(page, "PRINT ANYWHERE", bold, 16, A4_HEIGHT - 80, grey);
+  center(page, "IOIT PRINT ANYWHERE", bold, 16, A4_HEIGHT - 80, grey);
   center(page, "Printing code", regular, 14, A4_HEIGHT - 150, grey);
 
   // Big boxed code

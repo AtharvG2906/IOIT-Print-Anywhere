@@ -1,5 +1,5 @@
 {
-  "serverUrl": "https://your-print-anywhere-domain.com",
+  "serverUrl": "https://your-ioit-print-anywhere-domain.com",
   "apiKey": "paste AGENT_API_KEY from the server's .env here",
   "agentId": "desk-pc-1",
   "printerName": "HP LaserJet M1136 MFP",
