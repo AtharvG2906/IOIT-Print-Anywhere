@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+enum OtpPurpose {
+  SIGNUP
+  RESET
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PRINTING
+  READY
+  COLLECTED
+  EXPIRED
+  FAILED
+}
+
+model User {
+  id              String    @id @default(cuid())
+  fullName        String
+  email           String    @unique
+  passwordHash    String
+  phone           String    @unique // 10-digit Indian mobile, no prefix
+  emailVerifiedAt DateTime
+  prn             String    @unique
+  department      String    @default("")
+  academicYear    String
+  className       String
+  batch           String
+  address         String
+  collegeIdKey    String? // storage key of the uploaded college ID
+  role            Role      @default(STUDENT)
+  blocked         Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  sessions        Session[]
+  documents       Document[]
+  orders          Order[]
+}
+
+model OtpCode {
+  id          String     @id @default(cuid())
+  target      String // email address the code was sent to
+  purpose     OtpPurpose
+  codeHash    String
+  attempts    Int        @default(0)
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime   @default(now())
+
+  @@index([target, purpose, createdAt])
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  expiresAt  DateTime
+
+  @@index([userId])
+}
+
+model Document {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  storageKey   String
+  originalName String
+  pageCount    Int
+  nonA4Pages   Int       @default(0)
+  sizeBytes    Int
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+  orders       Order[]
+}
+
+model Order {
+  id                String      @id @default(cuid())
+  userId            String
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentId        String
+  document          Document    @relation(fields: [documentId], references: [id])
+  copies            Int
+  pageRange         String // normalized, e.g. "1-3,5" or "all"
+  selectedPages     Int
+  ratePaise         Int
+  amountPaise       Int
+  status            OrderStatus @default(PENDING_PAYMENT)
+  printingCode      String?     @unique
+  razorpayOrderId   String?     @unique
+  razorpayQrId      String?     @unique
+  qrImageUrl        String?
+  razorpayPaymentId String?
+  coverKey          String?
+  attempts          Int         @default(0)
+  failureReason     String?
+  expiresAt         DateTime
+  createdAt         DateTime    @default(now())
+  paidAt            DateTime?
+  printStartedAt    DateTime?
+  lastProgressAt    DateTime?
+  readyAt           DateTime?
+  collectedAt       DateTime?
+  filesDeletedAt    DateTime?
+
+  @@index([status, paidAt])
+  @@index([userId, createdAt])
+}
+
+model Settings {
+  id               Int     @id @default(1)
+  ratePerPagePaise Int     @default(100)
+  maxCopies        Int     @default(10)
+  maxFileMB        Int     @default(25)
+  maxPages         Int     @default(300)
+  acceptingOrders  Boolean @default(true)
+}
+
+model AgentHeartbeat {
+  agentId       String   @id
+  lastSeenAt    DateTime @default(now())
+  printerStatus String?
+  currentOrder  String?
+}

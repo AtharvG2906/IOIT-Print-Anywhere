@@ -1,0 +1,11 @@
+{
+  "name": "print-anywhere-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Windows print agent for Print Anywhere",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node agent.mjs"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "serverUrl": "https://your-print-anywhere-domain.com",
+  "apiKey": "paste AGENT_API_KEY from the server's .env here",
+  "agentId": "desk-pc-1",
+  "printerName": "HP LaserJet M1136 MFP",
+  "sumatraPath": "C:\\Program Files\\SumatraPDF\\SumatraPDF.exe",
+  "pollSeconds": 5,
+  "heartbeatSeconds": 10,
+  "queueTimeoutMinutes": 120,
+  "dryRun": false
+}
