@@ -20,3 +20,26 @@ describe("emails", () => {
     expect(m.text).toContain("http://x/login");
   });
 });
+
+describe("emailIsSimulated", () => {
+  const original = { ...process.env };
+  const set = (vars: Record<string, string | undefined>) => {
+    for (const [k, v] of Object.entries(vars)) {
+      if (v === undefined) delete (process.env as Record<string, string | undefined>)[k];
+      else (process.env as Record<string, string | undefined>)[k] = v;
+    }
+  };
+
+  it("is true only for the console provider outside production", async () => {
+    const { emailIsSimulated } = await import("@/lib/email");
+    set({ EMAIL_PROVIDER: "console", NODE_ENV: "development" });
+    expect(emailIsSimulated()).toBe(true);
+    set({ EMAIL_PROVIDER: undefined, NODE_ENV: "development" });
+    expect(emailIsSimulated()).toBe(true);
+    set({ EMAIL_PROVIDER: "console", NODE_ENV: "production" });
+    expect(emailIsSimulated()).toBe(false);
+    set({ EMAIL_PROVIDER: "resend", NODE_ENV: "development" });
+    expect(emailIsSimulated()).toBe(false);
+    set({ EMAIL_PROVIDER: original.EMAIL_PROVIDER, NODE_ENV: original.NODE_ENV });
+  });
+});

@@ -53,7 +53,9 @@ npm run dev                    # http://localhost:3000
 
 In development:
 
-- **OTPs and emails** are printed in the terminal (`EMAIL_PROVIDER=console`).
+- **OTPs and emails** are printed in the terminal (`EMAIL_PROVIDER=console`). OTP codes also appear
+  **on screen** in a yellow "Dev mode" box with a *Fill it in* button. This never shows in production
+  or once Resend is set up.
 - **Payments:** with no Razorpay keys set, the pay page shows a **"Simulate payment"** button.
 - **Admin access:** add your email to `ADMIN_EMAILS` and log in. You'll see **Desk** in the header.
 - **Print agent:** to try it locally, copy `agent/agent.config.example.json` to `agent/agent.config.json`,

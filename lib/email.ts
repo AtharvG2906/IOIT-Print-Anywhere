@@ -3,9 +3,20 @@ import { Resend } from "resend";
 
 type Mail = { to: string; subject: string; html: string; text: string };
 
+/**
+ * True on localhost when no real email service is configured: emails are only
+ * printed to the terminal, so OTP codes are also shown on screen for testing.
+ */
+export function emailIsSimulated(): boolean {
+  return (process.env.EMAIL_PROVIDER ?? "console") === "console" && process.env.NODE_ENV !== "production";
+}
+
 async function send(mail: Mail): Promise<void> {
   const provider = process.env.EMAIL_PROVIDER ?? "console";
   if (provider === "console") {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error('EMAIL_PROVIDER="console" is not allowed in production — set up Resend.');
+    }
     console.log(`\n[email:console] To: ${mail.to}\nSubject: ${mail.subject}\n${mail.text}\n`);
     return;
   }

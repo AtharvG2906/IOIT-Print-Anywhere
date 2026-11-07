@@ -1,13 +1,15 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { completePasswordReset, requestPasswordReset, type FormState } from "@/app/actions/auth";
 import { Alert, Field, inputClass } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
+import { DevOtpNotice } from "@/components/DevOtpNotice";
 
 export function ForgotPasswordForm() {
   const [requestState, request] = useActionState<FormState, FormData>(requestPasswordReset, {});
   const [resetState, reset] = useActionState<FormState, FormData>(completePasswordReset, {});
+  const [otp, setOtp] = useState("");
 
   if (requestState.step !== "otp") {
     return (
@@ -24,8 +26,9 @@ export function ForgotPasswordForm() {
   return (
     <form action={reset} className="space-y-4">
       <Alert kind="info">{requestState.message}</Alert>
+      {requestState.devCode && <DevOtpNotice code={requestState.devCode} onFill={setOtp} />}
       <Field label="6-digit code" htmlFor="otp" error={e.otp}>
-        <input id="otp" name="otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} className={`${inputClass} font-mono tracking-[0.4em]`} required autoFocus />
+        <input id="otp" name="otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={(ev) => setOtp(ev.target.value.replace(/\D/g, ""))} className={`${inputClass} font-mono tracking-[0.4em]`} required autoFocus />
       </Field>
       <Field label="New password" htmlFor="password" error={e.password} hint="At least 8 characters.">
         <input id="password" name="password" type="password" autoComplete="new-password" className={inputClass} required />

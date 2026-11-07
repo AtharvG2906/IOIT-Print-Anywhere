@@ -26,6 +26,7 @@ export type FormState = {
   values?: Record<string, string>;
   message?: string;
   step?: string;
+  devCode?: string; // localhost only: the OTP, shown on screen because emails aren't really sent
 };
 
 const emailSchema = z.string().trim().toLowerCase().pipe(z.email());
@@ -37,7 +38,7 @@ function maskEmail(email: string) {
 
 // ---------- Create account ----------
 
-export type SendOtpResult = { ok: true; sentTo: string } | { ok: false; error: string };
+export type SendOtpResult = { ok: true; sentTo: string; devCode?: string } | { ok: false; error: string };
 
 /** "Send OTP" button on the signup form: emails a 6-digit code right away. */
 export async function sendSignupOtp(rawEmail: string): Promise<SendOtpResult> {
@@ -49,7 +50,7 @@ export async function sendSignupOtp(rawEmail: string): Promise<SendOtpResult> {
     return { ok: false, error: "An account with this email already exists. Try logging in." };
   }
   const sent = await issueOtp(email, "SIGNUP");
-  return sent.ok ? { ok: true, sentTo: maskEmail(email) } : sent;
+  return sent.ok ? { ok: true, sentTo: maskEmail(email), devCode: sent.devCode } : sent;
 }
 
 const SIGNUP_FIELDS = [
@@ -176,15 +177,17 @@ export async function requestPasswordReset(_prev: FormState, formData: FormData)
     ? await db.user.findUnique({ where: { email: identifier.toLowerCase() } })
     : await db.user.findUnique({ where: { prn: normalizePrn(identifier) } });
 
+  let devCode: string | undefined;
   if (user && !user.blocked) {
     const sent = await issueOtp(user.email, "RESET");
     if (!sent.ok) return { errors: { identifier: sent.error }, values: { identifier } };
+    devCode = sent.devCode;
     (await cookies()).set(RESET_COOKIE, user.id, tempCookie(15 * 60));
   } else {
     (await cookies()).delete(RESET_COOKIE);
   }
   // Same response either way so accounts can't be discovered here.
-  return { step: "otp", message: "If that account exists, we've sent a 6-digit code to its registered email." };
+  return { step: "otp", message: "If that account exists, we've sent a 6-digit code to its registered email.", devCode };
 }
 
 export async function completePasswordReset(_prev: FormState, formData: FormData): Promise<FormState> {

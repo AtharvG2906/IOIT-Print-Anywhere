@@ -5,6 +5,7 @@ import { createAccount, sendSignupOtp, type FormState } from "@/app/actions/auth
 import { ACADEMIC_YEARS, DEPARTMENTS } from "@/lib/validation";
 import { Alert, Field, inputClass, secondaryButtonClass } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
+import { DevOtpNotice } from "@/components/DevOtpNotice";
 
 export function SignupForm() {
   const [state, action] = useActionState<FormState, FormData>(createAccount, {});
@@ -17,6 +18,7 @@ export function SignupForm() {
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [sentFor, setSentFor] = useState<string | null>(null);
   const [otpError, setOtpError] = useState<string | null>(null);
+  const [devCode, setDevCode] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const [sending, startSending] = useTransition();
 
@@ -31,6 +33,7 @@ export function SignupForm() {
     if (sentFor && value.trim().toLowerCase() !== sentFor) {
       setSentTo(null);
       setSentFor(null);
+      setDevCode(null);
       setOtp("");
       setCooldown(0);
     }
@@ -42,6 +45,7 @@ export function SignupForm() {
       const result = await sendSignupOtp(email);
       if (result.ok) {
         setSentTo(result.sentTo);
+        setDevCode(result.devCode ?? null);
         setSentFor(email.trim().toLowerCase());
         setCooldown(30);
       } else {
@@ -146,6 +150,11 @@ export function SignupForm() {
                 autoFocus
               />
             </Field>
+            {devCode && (
+              <div className="mt-2">
+                <DevOtpNotice code={devCode} onFill={setOtp} />
+              </div>
+            )}
           </div>
         )}
 

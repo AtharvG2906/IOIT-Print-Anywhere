@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { hmacSha256Hex, randomDigits, safeEqual } from "@/lib/crypto";
-import { sendOtpEmail } from "@/lib/email";
+import { emailIsSimulated, sendOtpEmail } from "@/lib/email";
 import { SlidingWindowLimiter } from "@/lib/rateLimit";
 import type { OtpPurpose } from "@/lib/generated/prisma/enums";
 
@@ -19,6 +19,8 @@ const hashOtp = (email: string, purpose: OtpPurpose, code: string) =>
   hmacSha256Hex(env.sessionSecret(), `otp:${purpose}:${email}:${code}`);
 
 export type OtpResult = { ok: true } | { ok: false; error: string };
+/** `devCode` is only present on localhost without a real email service (see emailIsSimulated). */
+export type IssueOtpResult = { ok: true; devCode?: string } | { ok: false; error: string };
 
 async function clientIp(): Promise<string> {
   const h = await headers();
@@ -26,7 +28,7 @@ async function clientIp(): Promise<string> {
 }
 
 /** Emails a fresh 6-digit code to `email`. Rate limited per email and per IP. */
-export async function issueOtp(email: string, purpose: OtpPurpose): Promise<OtpResult> {
+export async function issueOtp(email: string, purpose: OtpPurpose): Promise<IssueOtpResult> {
   const now = Date.now();
   const recent = await db.otpCode.findMany({
     where: { target: email, purpose, createdAt: { gt: new Date(now - 60 * 60 * 1000) } },
@@ -58,7 +60,7 @@ export async function issueOtp(email: string, purpose: OtpPurpose): Promise<OtpR
     await db.otpCode.delete({ where: { id: otp.id } }).catch(() => {});
     return { ok: false, error: "We couldn't send the email right now. Check the address and try again." };
   }
-  return { ok: true };
+  return emailIsSimulated() ? { ok: true, devCode: code } : { ok: true };
 }
 
 export async function verifyOtp(email: string, purpose: OtpPurpose, code: string): Promise<OtpResult> {
