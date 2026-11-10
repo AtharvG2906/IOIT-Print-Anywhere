@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { inspectPdf } from "@/lib/pdf";
-import { storage } from "@/lib/storage";
+import { putFileSafely } from "@/lib/storage";
 import { randomToken } from "@/lib/crypto";
 
 const err = (status: number, error: string) => Response.json({ error }, { status });
@@ -43,7 +43,8 @@ export async function POST(req: Request) {
   }
 
   const key = `documents/${user.id}/${randomToken(12)}.pdf`;
-  await storage().put(key, bytes, "application/pdf");
+  const saveError = await putFileSafely(key, bytes, "application/pdf");
+  if (saveError) return err(503, saveError);
   const doc = await db.document.create({
     data: {
       userId: user.id,

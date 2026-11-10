@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { storage } from "@/lib/storage";
+import { putFileSafely, storage } from "@/lib/storage";
 import { randomToken } from "@/lib/crypto";
 import { sniffIdType } from "@/lib/fileSniff";
 
@@ -25,7 +25,8 @@ export async function POST(req: Request) {
   if (!kind) return err(400, "Upload a JPG, PNG or PDF.");
 
   const key = `college-ids/${user.id}/${randomToken(12)}.${kind.ext}`;
-  await storage().put(key, bytes, kind.type);
+  const saveError = await putFileSafely(key, bytes, kind.type);
+  if (saveError) return err(503, saveError);
 
   const previous = await db.user.findUnique({ where: { id: user.id }, select: { collegeIdKey: true } });
   await db.user.update({ where: { id: user.id }, data: { collegeIdKey: key } });

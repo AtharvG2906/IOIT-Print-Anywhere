@@ -58,8 +58,39 @@ function s3Driver(): Driver {
   };
 }
 
+export class StorageNotConfiguredError extends Error {}
+
+/** Used on Vercel without S3: every call fails (as a rejected promise) with a clear message. */
+function notConfiguredDriver(): Driver {
+  const fail = () =>
+    Promise.reject(
+      new StorageNotConfiguredError(
+        'File storage is not configured: set STORAGE_DRIVER="s3" and the S3_* variables (e.g. Cloudflare R2) in Vercel.',
+      ),
+    );
+  return { put: fail, get: fail, remove: fail };
+}
+
 let driver: Driver | undefined;
 export function storage(): Driver {
-  driver ??= process.env.STORAGE_DRIVER === "s3" ? s3Driver() : localDriver();
+  driver ??=
+    process.env.STORAGE_DRIVER === "s3"
+      ? s3Driver()
+      : process.env.VERCEL // Vercel's filesystem is read-only, so local storage can't work there.
+        ? notConfiguredDriver()
+        : localDriver();
   return driver;
+}
+
+/** Saves a file; returns an error message for the student instead of throwing. */
+export async function putFileSafely(key: string, body: Uint8Array, contentType: string): Promise<string | null> {
+  try {
+    await storage().put(key, body, contentType);
+    return null;
+  } catch (err) {
+    console.error("[storage] put failed:", err instanceof Error ? err.message : err);
+    return err instanceof StorageNotConfiguredError
+      ? "Uploads aren't set up on the server yet. Please tell the print desk."
+      : "We couldn't save your file right now. Please try again in a minute.";
+  }
 }

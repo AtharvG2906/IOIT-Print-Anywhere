@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useTransition } from "react";
 import { createAccount, forgetVerifiedEmail, type FormState } from "@/app/actions/auth";
 import { ACADEMIC_YEARS, DEPARTMENTS } from "@/lib/validation";
 import { Alert, Field, inputClass } from "@/components/ui";
@@ -9,6 +9,10 @@ import { SubmitButton } from "@/components/SubmitButton";
 /** Sign-up step 2: the email is already verified (signed cookie); collect details and a password. */
 export function SignupForm({ verifiedEmail }: { verifiedEmail: string }) {
   const [state, action] = useActionState<FormState, FormData>(createAccount, {});
+  // "Change"/"Verify again" are plain buttons (not submit buttons), so pressing Enter in a field
+  // always submits "Create account" instead of throwing the student back to the email step.
+  const [leaving, startLeaving] = useTransition();
+  const restartVerification = () => startLeaving(() => forgetVerifiedEmail());
   const e = state.errors ?? {};
   const v = state.values ?? {};
 
@@ -18,7 +22,7 @@ export function SignupForm({ verifiedEmail }: { verifiedEmail: string }) {
         <Alert kind="error">
           {state.message}{" "}
           {state.step === "reverify" && (
-            <button type="submit" formAction={forgetVerifiedEmail} formNoValidate className="font-semibold underline">
+            <button type="button" onClick={restartVerification} disabled={leaving} className="font-semibold underline">
               Verify again
             </button>
           )}
@@ -70,7 +74,7 @@ export function SignupForm({ verifiedEmail }: { verifiedEmail: string }) {
             <div className="flex items-center gap-2">
               <input id="email" type="email" value={verifiedEmail} readOnly disabled className={inputClass} />
               <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">✓ Verified</span>
-              <button type="submit" formAction={forgetVerifiedEmail} formNoValidate className="shrink-0 text-sm text-stone-600 underline">
+              <button type="button" onClick={restartVerification} disabled={leaving} className="shrink-0 text-sm text-stone-600 underline">
                 Change
               </button>
             </div>
