@@ -9,7 +9,9 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Migrations need a direct (non-pooled) connection on Neon. Only the Prisma CLI uses this URL;
+    // the app itself (lib/db.ts) keeps using the pooled DATABASE_URL.
+    url: process.env["DATABASE_URL_UNPOOLED"] || process.env["DATABASE_URL"],
     // Local `prisma dev` runs a separate clean shadow database; leave unset in production.
     shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"],
   },

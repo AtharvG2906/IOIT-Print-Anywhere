@@ -74,8 +74,9 @@ Tests: `npm test` (unit tests) · `npm run typecheck` · `npm run lint` · `npm 
 ## Going live
 
 1. **Database:** any managed Postgres (Neon, Supabase, Railway, etc.). Set `DATABASE_URL`, remove
-   `DATABASE_POOL_MAX`, and run `DATABASE_URL="<production url>" npx prisma migrate deploy` (again after
-   every pull that adds a migration — Vercel builds don't run migrations).
+   `DATABASE_POOL_MAX`. Vercel builds run `prisma migrate deploy` automatically (see `vercel.json`).
+   On Neon, migrations use the direct connection in `DATABASE_URL_UNPOOLED` (set by Vercel's Neon
+   integration; copy it from Neon → Connect with pooling off if missing). The app uses `DATABASE_URL`.
 2. **Hosting:** Vercel, Railway or any Node host. Set every variable from `.env.example` and set
    `APP_URL` to your domain.
 3. **File storage:** `STORAGE_DRIVER=s3` with a private Cloudflare R2 or S3 bucket.
