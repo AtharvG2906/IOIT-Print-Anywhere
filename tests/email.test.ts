@@ -1,14 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { buildOtpEmail, buildWelcomeEmail } from "@/lib/email";
+import { buildAccountExistsEmail, buildOtpEmail, buildWelcomeEmail } from "@/lib/email";
 
 describe("emails", () => {
-  it("OTP email carries the code in subject, text and HTML", () => {
+  it("OTP email carries the code in text and HTML but not the subject", () => {
     const m = buildOtpEmail("a@b.com", "482913", "SIGNUP");
-    expect(m.subject).toContain("482913");
+    expect(m.subject).not.toContain("482913");
     expect(m.text).toContain("482913");
     expect(m.html).toContain("482913");
     expect(m.text).toContain("create your IOIT Print Anywhere account");
     expect(buildOtpEmail("a@b.com", "111111", "RESET").text).toContain("reset your IOIT Print Anywhere password");
+  });
+
+  it("account-exists email has no code and points to login / reset", () => {
+    const m = buildAccountExistsEmail("a@b.com", "http://x");
+    expect(m.subject).toBe(buildOtpEmail("a@b.com", "000000", "SIGNUP").subject);
+    expect(m.text).toContain("http://x/login");
+    expect(m.text).toContain("http://x/forgot-password");
+    expect(m.text).not.toMatch(/\b\d{6}\b/);
   });
 
   it("welcome email greets the student and escapes HTML", () => {
@@ -32,10 +40,14 @@ describe("emailIsSimulated", () => {
 
   it("is true only for the console provider outside production", async () => {
     const { emailIsSimulated } = await import("@/lib/email");
-    set({ EMAIL_PROVIDER: "console", NODE_ENV: "development" });
+    set({ EMAIL_PROVIDER: "console", NODE_ENV: "development", RESEND_API_KEY: undefined });
     expect(emailIsSimulated()).toBe(true);
     set({ EMAIL_PROVIDER: undefined, NODE_ENV: "development" });
     expect(emailIsSimulated()).toBe(true);
+    // With a Resend key and no EMAIL_PROVIDER, Resend is used.
+    set({ EMAIL_PROVIDER: undefined, RESEND_API_KEY: "re_test" });
+    expect(emailIsSimulated()).toBe(false);
+    set({ RESEND_API_KEY: original.RESEND_API_KEY });
     set({ EMAIL_PROVIDER: "console", NODE_ENV: "production" });
     expect(emailIsSimulated()).toBe(false);
     set({ EMAIL_PROVIDER: "resend", NODE_ENV: "development" });

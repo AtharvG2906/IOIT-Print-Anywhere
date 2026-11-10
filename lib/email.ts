@@ -1,46 +1,68 @@
 import "server-only";
 import { Resend } from "resend";
+import { env } from "@/lib/env";
 
 type Mail = { to: string; subject: string; html: string; text: string };
+type SendOptions = { from?: string; category?: string };
+
+/** "console" (print to terminal) or "resend". Defaults to resend whenever RESEND_API_KEY is set. */
+function provider(): string {
+  return process.env.EMAIL_PROVIDER || (process.env.RESEND_API_KEY ? "resend" : "console");
+}
 
 /**
  * True on localhost when no real email service is configured: emails are only
  * printed to the terminal, so OTP codes are also shown on screen for testing.
  */
 export function emailIsSimulated(): boolean {
-  return (process.env.EMAIL_PROVIDER ?? "console") === "console" && process.env.NODE_ENV !== "production";
+  return provider() === "console" && process.env.NODE_ENV !== "production";
 }
 
-async function send(mail: Mail): Promise<void> {
-  const provider = process.env.EMAIL_PROVIDER ?? "console";
-  if (provider === "console") {
+/**
+ * Sends one email. Throws an Error whose message holds only the provider's reason
+ * (never the subject or body, so OTP codes can't end up in logs).
+ */
+async function send(mail: Mail, opts: SendOptions = {}): Promise<void> {
+  const p = provider();
+  if (p === "console") {
     if (process.env.NODE_ENV === "production") {
-      throw new Error('EMAIL_PROVIDER="console" is not allowed in production — set up Resend.');
+      throw new Error("No email provider configured in production (set RESEND_API_KEY).");
     }
     console.log(`\n[email:console] To: ${mail.to}\nSubject: ${mail.subject}\n${mail.text}\n`);
     return;
   }
-  if (provider === "resend") {
+  if (p === "resend") {
+    if (!process.env.RESEND_API_KEY) throw new Error("Resend missing_api_key: RESEND_API_KEY is not set");
     const resend = new Resend(process.env.RESEND_API_KEY);
-    const { error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM ?? "IOIT Print Anywhere <onboarding@resend.dev>",
-      to: mail.to,
-      subject: mail.subject,
-      html: mail.html,
-      text: mail.text,
-    });
-    if (error) throw new Error(`Resend error: ${error.message}`);
+    let result: Awaited<ReturnType<typeof resend.emails.send>>;
+    try {
+      result = await resend.emails.send({
+        from: opts.from ?? process.env.EMAIL_FROM ?? "IOIT Print Anywhere <onboarding@resend.dev>",
+        to: mail.to,
+        subject: mail.subject,
+        html: mail.html,
+        text: mail.text,
+        tags: opts.category ? [{ name: "category", value: opts.category }] : undefined,
+      });
+    } catch (err) {
+      // Network failure, timeout, etc.
+      throw new Error(`Resend request failed: ${err instanceof Error ? err.message : "unknown error"}`);
+    }
+    if (result.error) {
+      const { name, statusCode, message } = result.error;
+      throw new Error(`Resend ${name} (${statusCode ?? "no status"}): ${message}`);
+    }
     return;
   }
-  throw new Error(`Unknown EMAIL_PROVIDER "${provider}"`);
+  throw new Error(`Unknown EMAIL_PROVIDER "${p}"`);
 }
 
 /** Never let an email failure break the order flow; log it instead. */
-async function sendSafely(mail: Mail) {
+async function sendSafely(mail: Mail, category: string) {
   try {
-    await send(mail);
+    await send(mail, { category });
   } catch (err) {
-    console.error("[email] failed to send", mail.subject, err);
+    console.error(`[email] could not send ${category} email:`, err instanceof Error ? err.message : "unknown error");
   }
 }
 
@@ -65,7 +87,8 @@ export function buildOtpEmail(to: string, code: string, purpose: "SIGNUP" | "RES
   const action = purpose === "SIGNUP" ? "create your IOIT Print Anywhere account" : "reset your IOIT Print Anywhere password";
   return {
     to,
-    subject: `${code} is your IOIT Print Anywhere verification code`,
+    // The code is deliberately not in the subject (it would show in notifications and provider logs).
+    subject: purpose === "SIGNUP" ? "Your IOIT Print Anywhere sign-up code" : "Your IOIT Print Anywhere password reset code",
     text: `Use this code to ${action}: ${code}\n\nIt expires in 5 minutes. If you didn't ask for it, you can ignore this email.`,
     html: layout(
       "Your verification code",
@@ -74,9 +97,30 @@ export function buildOtpEmail(to: string, code: string, purpose: "SIGNUP" | "RES
   };
 }
 
-/** Sends an OTP. Unlike the other emails this throws on failure, so the form can tell the student. */
+/** Sent instead of a sign-up code when the email already has an account (the website never says so). */
+export function buildAccountExistsEmail(to: string, appUrl: string): Mail {
+  return {
+    to,
+    subject: "Your IOIT Print Anywhere sign-up code",
+    text: `Someone (hopefully you) tried to create an IOIT Print Anywhere account with this email, but you already have one.\n\nLog in: ${appUrl}/login\nForgot your password? ${appUrl}/forgot-password\n\nIf this wasn't you, you can ignore this email.`,
+    html: layout(
+      "You already have an account",
+      `<p>Someone (hopefully you) tried to create an IOIT Print Anywhere account with this email, but you already have one.</p>
+      <p><a href="${appUrl}/login" style="display:inline-block;background:#1c1917;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold">Log in</a></p>
+      <p>Forgot your password? <a href="${appUrl}/forgot-password">Reset it here</a>.</p>
+      <p style="color:#78716c;font-size:13px">If this wasn't you, you can ignore this email.</p>`,
+    ),
+  };
+}
+
+/** Sends an OTP from OTP_FROM. Unlike the other emails this throws on failure, so the form can tell the student. */
 export async function sendOtpEmail(to: string, code: string, purpose: "SIGNUP" | "RESET") {
-  await send(buildOtpEmail(to, code, purpose));
+  await send(buildOtpEmail(to, code, purpose), { from: env.otpFrom(), category: "otp" });
+}
+
+/** Throws on failure (same as sendOtpEmail) so both paths behave identically. */
+export async function sendAccountExistsEmail(to: string) {
+  await send(buildAccountExistsEmail(to, env.appUrl()), { from: env.otpFrom(), category: "otp" });
 }
 
 type WelcomeMail = { to: string; name: string; prn: string; department: string; appUrl: string };
@@ -104,7 +148,7 @@ export function buildWelcomeEmail(w: WelcomeMail): Mail {
 }
 
 export function sendWelcomeEmail(w: WelcomeMail) {
-  return sendSafely(buildWelcomeEmail(w));
+  return sendSafely(buildWelcomeEmail(w), "welcome");
 }
 
 // ---------- Order emails ----------
@@ -120,7 +164,7 @@ export function sendPaymentReceivedEmail(o: OrderMail) {
       "Payment received",
       `<p>Hi ${escapeHtml(o.name)},</p><p>We received <b>${escapeHtml(o.amount)}</b> for <b>${escapeHtml(o.fileName)}</b>. Your printing code:</p>${codeBlock(o.code)}<p>We'll email you again when your prints are ready. Bring your <b>college ID card</b> to collect them.</p><p><a href="${o.orderUrl}">View order</a></p>`,
     ),
-  });
+  }, "payment-received");
 }
 
 export function sendPrintsReadyEmail(o: OrderMail) {
@@ -132,5 +176,5 @@ export function sendPrintsReadyEmail(o: OrderMail) {
       "Your prints are ready 🎉",
       `<p>Hi ${escapeHtml(o.name)},</p><p>Your prints of <b>${escapeHtml(o.fileName)}</b> are ready for pickup.</p>${codeBlock(o.code)}<p>Show this code and your <b>college ID card</b> at the desk.</p><p><a href="${o.orderUrl}">View order</a></p>`,
     ),
-  });
+  }, "prints-ready");
 }

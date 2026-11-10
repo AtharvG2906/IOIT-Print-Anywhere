@@ -2,12 +2,15 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { otpBypassed } from "@/lib/otp";
+import { getVerifiedEmail } from "@/lib/verifiedEmail";
 import { Card, PageTitle } from "@/components/ui";
 import { SignupForm } from "./SignupForm";
+import { VerifyEmailStep } from "./VerifyEmailStep";
 import { Steps } from "@/components/SignupSteps";
 
 export default async function SignupPage() {
   if (await getCurrentUser()) redirect("/print");
+  const verifiedEmail = await getVerifiedEmail();
   return (
     <div className="mx-auto max-w-2xl">
       <Steps current={1} />
@@ -19,9 +22,16 @@ export default async function SignupPage() {
           </>
         }
       />
-      <Card>
-        <SignupForm otpBypass={otpBypassed()} />
-      </Card>
+      {verifiedEmail ? (
+        <Card>
+          <SignupForm verifiedEmail={verifiedEmail} />
+        </Card>
+      ) : (
+        <Card className="mx-auto max-w-md">
+          <h2 className="mb-4 font-semibold">First, verify your email</h2>
+          <VerifyEmailStep otpBypass={otpBypassed()} />
+        </Card>
+      )}
     </div>
   );
 }

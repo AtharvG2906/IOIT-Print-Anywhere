@@ -18,12 +18,17 @@ Windows PC ── agent/agent.mjs ─► SumatraPDF ─► Printer
 
 ## Features
 
-- **Create account:** name, academic year, PRN, department, class, batch, phone, email, address and password.
-  A **Send OTP** button next to the email field emails a 6-digit code at once. The student enters it on the same
-  form and clicks **Create account**. They then get a **welcome email** and upload their college ID.
-  Any email domain can sign up. PRN, phone and email must each be unique. OTPs are rate limited
-  (30 s resend, 5 per hour per email, 20 per hour per IP address).
-- **Log in:** with email or PRN plus password. Sessions end when the browser closes, or after 2 hours idle.
+- **Create account:** step 1, the student enters their email, gets a 6-digit code (sent with Resend) and
+  verifies it. Step 2, they fill in name, academic year, PRN, department, class, batch, phone, address
+  and a password, then click **Create account**. They're logged in, get a **welcome email**, and upload their college ID.
+  - Codes expire after 5 minutes and allow 5 wrong tries. Only an HMAC-SHA256 hash (keyed with `OTP_SECRET`)
+    is stored, and a code is deleted once used.
+  - Limits: 60 s between sends, 3 per 10 minutes per email, 20 per hour per IP.
+  - The site never says whether an email is already registered: such emails get a "you already have an
+    account" email instead of a code.
+  - Set `ALLOWED_EMAIL_DOMAIN` to restrict sign-up to college emails. PRN, phone and email must each be unique.
+  - Endpoints: `POST /api/auth/otp/send` `{email}` and `POST /api/auth/otp/verify` `{email, code}`.
+- **Log in:** with email or PRN plus password (no OTP). Sessions end when the browser closes, or after 2 hours idle.
   Students can reset a forgotten password with an email OTP.
 - **Print:** PDF only, with the size and page limits shown in the upload area.
   The server checks the file really is a PDF, rejects encrypted or damaged files, and warns when pages
@@ -46,18 +51,18 @@ Needs Node.js 20+. No Docker is required, because Prisma runs a local Postgres f
 ```bash
 npm install
 npm run db:dev                 # starts a local Postgres (prisma dev) in the background
-cp .env.example .env           # then set SESSION_SECRET and AGENT_API_KEY (openssl rand -hex 32)
+cp .env.example .env           # then set SESSION_SECRET, OTP_SECRET and AGENT_API_KEY (openssl rand -hex 32)
 npx prisma migrate dev         # creates the tables
 npm run dev                    # http://localhost:3000
 ```
 
 In development:
 
-- **OTPs and emails** are printed in the terminal (`EMAIL_PROVIDER=console`). OTP codes also appear
+- **OTPs and emails** are printed in the terminal when `RESEND_API_KEY` is empty. OTP codes also appear
   **on screen** in a yellow "Dev mode" box with a *Fill it in* button. This never shows in production
   or once Resend is set up.
-- **Skipping OTPs:** set `OTP_BYPASS="true"` in `.env` to create accounts without a code (the box is prefilled
-  with `000000` and any number works). It is ignored in production.
+- **Skipping OTPs:** set `OTP_BYPASS="true"` in `.env` and any 6-digit code passes verification.
+  It is ignored in production.
 - **Payments:** with no Razorpay keys set, the pay page shows a **"Simulate payment"** button.
 - **Admin access:** add your email to `ADMIN_EMAILS` and log in. You'll see **Desk** in the header.
 - **Print agent:** to try it locally, copy `agent/agent.config.example.json` to `agent/agent.config.json`,
@@ -69,7 +74,8 @@ Tests: `npm test` (unit tests) · `npm run typecheck` · `npm run lint` · `npm 
 ## Going live
 
 1. **Database:** any managed Postgres (Neon, Supabase, Railway, etc.). Set `DATABASE_URL`, remove
-   `DATABASE_POOL_MAX`, and run `npx prisma migrate deploy`.
+   `DATABASE_POOL_MAX`, and run `DATABASE_URL="<production url>" npx prisma migrate deploy` (again after
+   every pull that adds a migration — Vercel builds don't run migrations).
 2. **Hosting:** Vercel, Railway or any Node host. Set every variable from `.env.example` and set
    `APP_URL` to your domain.
 3. **File storage:** `STORAGE_DRIVER=s3` with a private Cloudflare R2 or S3 bucket.
@@ -79,9 +85,10 @@ Tests: `npm test` (unit tests) · `npm run typecheck` · `npm run lint` · `npm 
    - Ask Razorpay to **enable QR Codes** on your account.
    - Add a webhook pointing to `https://<your-domain>/api/webhooks/razorpay`, subscribed to
      `payment.captured`, `order.paid` and `qr_code.credited`. Put its secret in `RAZORPAY_WEBHOOK_SECRET`.
-5. **Email (OTPs and notifications):** `EMAIL_PROVIDER=resend`. Verify your sending domain in Resend
-   (without one, Resend only delivers to your own account address) and set `RESEND_API_KEY`
-   and `EMAIL_FROM`.
+5. **Email (OTPs and notifications):** verify your sending domain in Resend (without one, Resend only
+   delivers to your own account address). Set `RESEND_API_KEY`, `OTP_FROM` (OTP sender), `EMAIL_FROM`
+   (other emails), `OTP_SECRET`, and optionally `ALLOWED_EMAIL_DOMAIN`. OTP emails are tagged
+   `category: otp` in Resend.
 6. **Printer PC:** follow [`agent/README.md`](agent/README.md).
 7. **Optional backup cron:** `GET /api/cron/maintenance` with `Authorization: Bearer <CRON_SECRET>`.
    The agent heartbeat already runs maintenance every minute.

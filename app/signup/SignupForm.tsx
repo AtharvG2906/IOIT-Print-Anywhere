@@ -1,65 +1,29 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
-import { createAccount, sendSignupOtp, type FormState } from "@/app/actions/auth";
+import { useActionState } from "react";
+import { createAccount, forgetVerifiedEmail, type FormState } from "@/app/actions/auth";
 import { ACADEMIC_YEARS, DEPARTMENTS } from "@/lib/validation";
-import { Alert, Field, inputClass, secondaryButtonClass } from "@/components/ui";
+import { Alert, Field, inputClass } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
-import { DevOtpNotice } from "@/components/DevOtpNotice";
 
-export function SignupForm({ otpBypass = false }: { otpBypass?: boolean }) {
+/** Sign-up step 2: the email is already verified (signed cookie); collect details and a password. */
+export function SignupForm({ verifiedEmail }: { verifiedEmail: string }) {
   const [state, action] = useActionState<FormState, FormData>(createAccount, {});
   const e = state.errors ?? {};
   const v = state.values ?? {};
 
-  // Email OTP: the code is tied to the address it was sent to.
-  const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState(otpBypass ? "000000" : "");
-  const [sentTo, setSentTo] = useState<string | null>(null);
-  const [sentFor, setSentFor] = useState<string | null>(null);
-  const [otpError, setOtpError] = useState<string | null>(null);
-  const [devCode, setDevCode] = useState<string | null>(null);
-  const [cooldown, setCooldown] = useState(0);
-  const [sending, startSending] = useTransition();
-
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [cooldown]);
-
-  function changeEmail(value: string) {
-    setEmail(value);
-    if (sentFor && value.trim().toLowerCase() !== sentFor) {
-      setSentTo(null);
-      setSentFor(null);
-      setDevCode(null);
-      setOtp("");
-      setCooldown(0);
-    }
-  }
-
-  function sendOtp() {
-    setOtpError(null);
-    startSending(async () => {
-      const result = await sendSignupOtp(email);
-      if (result.ok) {
-        setSentTo(result.sentTo);
-        setDevCode(result.devCode ?? null);
-        setSentFor(email.trim().toLowerCase());
-        setCooldown(30);
-      } else {
-        setOtpError(result.error);
-      }
-    });
-  }
-
-  const sendLabel = sending ? "Sending…" : cooldown > 0 ? `Resend in ${cooldown}s` : sentTo ? "Resend OTP" : "Send OTP";
-  const otpFieldError = e.otp ?? otpError ?? undefined;
-
   return (
     <form action={action} className="space-y-5" noValidate>
-      {state.message && <Alert kind="error">{state.message}</Alert>}
+      {state.message && (
+        <Alert kind="error">
+          {state.message}{" "}
+          {state.step === "reverify" && (
+            <button type="submit" formAction={forgetVerifiedEmail} formNoValidate className="font-semibold underline">
+              Verify again
+            </button>
+          )}
+        </Alert>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
@@ -102,67 +66,16 @@ export function SignupForm({ otpBypass = false }: { otpBypass?: boolean }) {
           </div>
         </Field>
         <div className="sm:col-span-2">
-          <Field
-            label="Email address"
-            htmlFor="email"
-            error={e.email ?? (!sentTo ? (otpError ?? undefined) : undefined)}
-            hint={otpBypass ? "Print updates are sent here." : "We'll email you a code to verify it. Print updates are sent here too."}
-          >
-            <div className="flex gap-2">
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(ev) => changeEmail(ev.target.value)}
-                className={inputClass}
-                required
-              />
-              {!otpBypass && (
-              <button
-                type="button"
-                onClick={sendOtp}
-                disabled={sending || cooldown > 0 || !email.trim()}
-                className={`${secondaryButtonClass} shrink-0 whitespace-nowrap`}
-              >
-                {sendLabel}
+          <Field label="Email address" htmlFor="email" error={e.email} hint="Print updates are sent here.">
+            <div className="flex items-center gap-2">
+              <input id="email" type="email" value={verifiedEmail} readOnly disabled className={inputClass} />
+              <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">✓ Verified</span>
+              <button type="submit" formAction={forgetVerifiedEmail} formNoValidate className="shrink-0 text-sm text-stone-600 underline">
+                Change
               </button>
-              )}
             </div>
           </Field>
         </div>
-
-        {(sentTo || otpBypass) && (
-          <div className="sm:col-span-2">
-            <Field label="Email OTP" htmlFor="otp" error={otpFieldError}>
-              {otpBypass ? (
-                <p className="mb-2 text-xs text-amber-700">OTP check is turned off for now — any number works.</p>
-              ) : (
-                <p className="mb-2 text-xs text-emerald-700">
-                  Code sent to <b>{sentTo}</b>. Check your inbox (and spam). It expires in 5 minutes.
-                </p>
-              )}
-              <input
-                id="otp"
-                name="otp"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                value={otp}
-                onChange={(ev) => setOtp(ev.target.value.replace(/\D/g, ""))}
-                placeholder="6-digit code"
-                className={`${inputClass} max-w-[220px] text-center font-mono text-xl tracking-[0.4em]`}
-                autoFocus={!otpBypass}
-              />
-            </Field>
-            {devCode && (
-              <div className="mt-2">
-                <DevOtpNotice code={devCode} onFill={setOtp} />
-              </div>
-            )}
-          </div>
-        )}
 
         <div className="sm:col-span-2">
           <Field label="Residential address" htmlFor="address" error={e.address}>
@@ -178,7 +91,6 @@ export function SignupForm({ otpBypass = false }: { otpBypass?: boolean }) {
         </Field>
       </div>
 
-      {!sentTo && e.otp && <Alert kind="error">{e.otp}</Alert>}
       <SubmitButton pendingText="Creating account…" className="w-full">Create account</SubmitButton>
     </form>
   );

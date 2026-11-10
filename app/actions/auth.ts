@@ -2,13 +2,14 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { z } from "zod";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { sendWelcomeEmail } from "@/lib/email";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { createSession, destroySession, hashPassword, isAdminUser, verifyPassword } from "@/lib/auth";
-import { issueOtp, otpBypassed, verifyOtp } from "@/lib/otp";
+import { issueOtp, verifyOtp } from "@/lib/otp";
+import { domainRestrictionMessage, emailDomainAllowed, parseAllowedDomains } from "@/lib/otpPolicy";
+import { clearVerifiedEmail, getVerifiedEmail } from "@/lib/verifiedEmail";
 import { fieldErrors, normalizePrn, passwordSchema, signupSchema, type SignupInput } from "@/lib/validation";
 
 const RESET_COOKIE = "pa_reset";
@@ -29,28 +30,14 @@ export type FormState = {
   devCode?: string; // localhost only: the OTP, shown on screen because emails aren't really sent
 };
 
-const emailSchema = z.string().trim().toLowerCase().pipe(z.email());
-
-function maskEmail(email: string) {
-  const [user, domain] = email.split("@");
-  return `${user.slice(0, 2)}${"•".repeat(Math.max(1, Math.min(6, user.length - 2)))}@${domain}`;
-}
-
 // ---------- Create account ----------
+// Step 1 (email + code) uses POST /api/auth/otp/send and /api/auth/otp/verify, which leave a
+// signed "verified email" cookie. Step 2 below creates the account for that email only.
 
-export type SendOtpResult = { ok: true; sentTo: string; devCode?: string } | { ok: false; error: string };
-
-/** "Send OTP" button on the signup form: emails a 6-digit code right away. */
-export async function sendSignupOtp(rawEmail: string): Promise<SendOtpResult> {
-  const parsed = emailSchema.safeParse(rawEmail);
-  if (!parsed.success) return { ok: false, error: "Enter a valid email address first." };
-  const email = parsed.data;
-
-  if (await db.user.findUnique({ where: { email }, select: { id: true } })) {
-    return { ok: false, error: "An account with this email already exists. Try logging in." };
-  }
-  const sent = await issueOtp(email, "SIGNUP");
-  return sent.ok ? { ok: true, sentTo: maskEmail(email), devCode: sent.devCode } : sent;
+/** "Change email" on the sign-up form. */
+export async function forgetVerifiedEmail() {
+  await clearVerifiedEmail();
+  redirect("/signup");
 }
 
 const SIGNUP_FIELDS = [
@@ -59,25 +46,25 @@ const SIGNUP_FIELDS = [
 ] as const;
 
 export async function createAccount(_prev: FormState, formData: FormData): Promise<FormState> {
+  // The email comes from the signed cookie set by the verify endpoint, never from the form.
+  const verifiedEmail = await getVerifiedEmail();
   const raw = Object.fromEntries(SIGNUP_FIELDS.map((k) => [k, String(formData.get(k) ?? "")]));
-  const otp = String(formData.get("otp") ?? "").trim();
   // Never echo passwords back to the form.
   const values = { ...raw, password: "", confirmPassword: "" };
+  if (!verifiedEmail) {
+    return { values, message: "Your email verification expired. Please verify your email again." , step: "reverify" };
+  }
+  raw.email = verifiedEmail;
 
   const parsed = signupSchema.safeParse(raw);
-  const errors = parsed.success ? {} : fieldErrors(parsed.error);
-  const bypass = otpBypassed();
-  if (!otp && !bypass) errors.otp = "Click “Send OTP” and enter the 6-digit code from your email.";
-  if (!parsed.success || errors.otp) return { errors, values };
-
+  if (!parsed.success) return { errors: fieldErrors(parsed.error), values };
   const data = parsed.data;
+
+  const allowed = parseAllowedDomains(env.allowedEmailDomain());
+  if (!emailDomainAllowed(data.email, allowed)) return { message: domainRestrictionMessage(allowed), values };
+
   const taken = await findTakenFields(data);
   if (Object.keys(taken).length) return { errors: taken, values };
-
-  if (!bypass) {
-    const result = await verifyOtp(data.email, "SIGNUP", otp);
-    if (!result.ok) return { errors: { otp: result.error }, values };
-  }
 
   let user;
   try {
@@ -105,6 +92,7 @@ export async function createAccount(_prev: FormState, formData: FormData): Promi
     throw err;
   }
 
+  await clearVerifiedEmail();
   await sendWelcomeEmail({
     to: user.email,
     name: user.fullName,
@@ -123,6 +111,7 @@ async function findTakenFields(d: Pick<SignupInput, "email" | "prn" | "phone">) 
   });
   const errors: Record<string, string> = {};
   for (const u of existing) {
+    // Only reachable after the student proved they own this email, so this reveals nothing new.
     if (u.email === d.email) errors.email = "An account with this email already exists. Try logging in.";
     if (u.prn === d.prn) errors.prn = "This PRN is already registered. Try logging in.";
     if (u.phone === d.phone) errors.phone = "This phone number is already registered.";
@@ -183,8 +172,9 @@ export async function requestPasswordReset(_prev: FormState, formData: FormData)
   let devCode: string | undefined;
   if (user && !user.blocked) {
     const sent = await issueOtp(user.email, "RESET");
-    if (!sent.ok) return { errors: { identifier: sent.error }, values: { identifier } };
-    devCode = sent.devCode;
+    // Show the same message even when sending failed or was rate limited, so this form can't be
+    // used to discover accounts. (issueOtp already logged any email failure.)
+    if (sent.ok) devCode = sent.devCode;
     (await cookies()).set(RESET_COOKIE, user.id, tempCookie(15 * 60));
   } else {
     (await cookies()).delete(RESET_COOKIE);

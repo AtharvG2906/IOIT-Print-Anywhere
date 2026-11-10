@@ -50,17 +50,28 @@ model User {
   orders          Order[]
 }
 
+// Only an HMAC-SHA256 hash of each code is stored (keyed with OTP_SECRET), never the code.
 model OtpCode {
   id          String     @id @default(cuid())
   target      String // email address the code was sent to
   purpose     OtpPurpose
   codeHash    String
-  attempts    Int        @default(0)
+  attempts    Int        @default(0) // wrong guesses so far
   expiresAt   DateTime
-  consumedAt  DateTime?
+  consumedAt  DateTime? // no longer used: replaced and used codes are deleted outright
   createdAt   DateTime   @default(now())
 
   @@index([target, purpose, createdAt])
+}
+
+// One row per OTP email actually sent, for the per-email rate limit. Kept separate from OtpCode
+// because codes are deleted as soon as they're used.
+model OtpSend {
+  id        String   @id @default(cuid())
+  target    String // email address
+  createdAt DateTime @default(now())
+
+  @@index([target, createdAt])
 }
 
 model Session {

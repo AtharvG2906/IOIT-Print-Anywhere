@@ -196,6 +196,7 @@ export async function runMaintenance() {
 
   await db.session.deleteMany({ where: { expiresAt: { lt: new Date(now) } } });
   await db.otpCode.deleteMany({ where: { createdAt: { lt: new Date(now - 24 * 60 * 60 * 1000) } } });
+  await db.otpSend.deleteMany({ where: { createdAt: { lt: new Date(now - 24 * 60 * 60 * 1000) } } });
 
   return { expired: expired.length, requeued: stuck.length, cleaned: toClean.length + orphans.length };
 }
