@@ -129,19 +129,18 @@ export function buildWelcomeEmail(w: WelcomeMail): Mail {
   return {
     to: w.to,
     subject: "Welcome to IOIT Print Anywhere 🎉",
-    text: `Hi ${w.name},\n\nYour IOIT Print Anywhere account is ready (PRN ${w.prn}, ${w.department}).\n\nHow it works:\n1. Upload a photo of your college ID (once).\n2. Upload a PDF, choose pages and copies (A4, black & white).\n3. Pay with UPI — you'll get a printing code.\n4. We email you when it's ready. Show the code and your college ID at the desk.\n\nLog in any time with your email or PRN: ${w.appUrl}/login`,
+    text: `Hi ${w.name},\n\nYour IOIT Print Anywhere account is ready (PRN ${w.prn}, ${w.department}).\n\nHow it works:\n1. Upload a PDF, choose pages and copies (A4, black & white).\n2. Pay with UPI — you'll get a printing code.\n3. We email you when it's ready. Show the code and your college ID at the desk.\n\nLog in any time with your email or PRN: ${w.appUrl}/login`,
     html: layout(
       `Welcome, ${escapeHtml(w.name.split(" ")[0])}!`,
       `<p>Your IOIT Print Anywhere account is ready.</p>
       <p style="background:#f5f5f4;border-radius:8px;padding:10px 14px;font-size:14px">PRN <b>${escapeHtml(w.prn)}</b> · ${escapeHtml(w.department)}</p>
       <p><b>How it works</b></p>
       <ol style="padding-left:20px;line-height:1.7">
-        <li>Upload a photo of your <b>college ID</b> (one time).</li>
         <li>Upload a PDF and choose pages &amp; copies — A4, black &amp; white.</li>
         <li>Pay with UPI and get your <b>printing code</b>.</li>
         <li>We'll email you when it's ready. Show the code and your college ID at the desk.</li>
       </ol>
-      <p><a href="${w.appUrl}/print" style="display:inline-block;background:#1c1917;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold">Print a document</a></p>
+      <p><a href="${w.appUrl}/dashboard" style="display:inline-block;background:#1c1917;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold">Open my dashboard</a></p>
       <p style="color:#78716c;font-size:13px">Log in any time with your email or PRN.</p>`,
     ),
   };

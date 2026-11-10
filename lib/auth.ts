@@ -80,13 +80,15 @@ export const getCurrentUser = cache(async () => {
 
 export type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
 
-/** For pages: redirects to login (and to the college ID step if it's missing). */
-export async function requireUser(opts: { needCollegeId?: boolean } = {}): Promise<CurrentUser> {
+/** For pages: redirects to login if nobody is logged in. */
+export async function requireUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (opts.needCollegeId && !user.hasCollegeId && !user.isAdmin) redirect("/signup/college-id");
   return user;
 }
+
+/** Where a logged-in person's "home" is: the desk for admins, the dashboard for students. */
+export const homePathFor = (user: { isAdmin: boolean }) => (user.isAdmin ? "/admin" : "/dashboard");
 
 export async function requireAdmin(): Promise<CurrentUser> {
   const user = await requireUser();

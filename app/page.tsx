@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getCurrentUser, homePathFor } from "@/lib/auth";
 import { getPrinterStatus, getSettings } from "@/lib/settings";
 import { formatRupees } from "@/lib/pricing";
 import { buttonClass, secondaryButtonClass } from "@/components/ui";
 
 export default async function Home() {
   const [user, settings, printer] = await Promise.all([getCurrentUser(), getSettings(), getPrinterStatus()]);
+  if (user) redirect(homePathFor(user));
 
   const steps = [
     ["Upload your PDF", `Up to ${settings.maxFileMB} MB and ${settings.maxPages} pages.`],

@@ -16,7 +16,6 @@ function cleanFileName(name: string): string {
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return err(401, "Please log in again.");
-  if (!user.hasCollegeId && !user.isAdmin) return err(403, "Upload your college ID before printing.");
 
   const settings = await getSettings();
   if (!settings.acceptingOrders) return err(503, "The print desk isn't accepting orders right now.");

@@ -22,6 +22,7 @@ async function Header() {
         <nav className="flex flex-wrap items-center gap-1">
           {user ? (
             <>
+              <Link href="/dashboard" className={link}>Dashboard</Link>
               <Link href="/print" className={link}>Print</Link>
               <Link href="/orders" className={link}>My orders</Link>
               {user.isAdmin && <Link href="/admin" className={link}>Desk</Link>}

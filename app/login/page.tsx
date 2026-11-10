@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, homePathFor } from "@/lib/auth";
 import { Alert, Card, PageTitle } from "@/components/ui";
 import { LoginForm } from "./LoginForm";
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
-  if (await getCurrentUser()) redirect("/print");
+  const current = await getCurrentUser();
+  if (current) redirect(homePathFor(current));
   const { reset } = await searchParams;
   return (
     <div className="mx-auto max-w-md">

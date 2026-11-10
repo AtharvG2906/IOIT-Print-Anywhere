@@ -1,5 +1,5 @@
 export function Steps({ current }: { current: 1 | 2 }) {
-  const steps = ["Your details", "College ID"];
+  const steps = ["Verify email", "Your details & ID card"];
   return (
     <ol className="mb-6 flex gap-2 text-xs font-medium">
       {steps.map((s, i) => (

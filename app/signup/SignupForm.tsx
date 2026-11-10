@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { createAccount, forgetVerifiedEmail, type FormState } from "@/app/actions/auth";
 import { ACADEMIC_YEARS, DEPARTMENTS } from "@/lib/validation";
 import { Alert, Field, buttonClass, inputClass } from "@/components/ui";
@@ -18,10 +18,30 @@ const FIELD_LABELS: Record<string, string> = {
   address: "Residential address",
   password: "Password",
   confirmPassword: "Confirm password",
+  collegeId: "College ID card",
 };
 
+const MAX_ID_BYTES = 4 * 1024 * 1024;
+
+/** Big phone photos are shrunk in the browser (longest side 1600 px, JPEG) so uploads are quick. */
+async function shrinkPhoto(file: File): Promise<File> {
+  if (!file.type.startsWith("image/") || file.size <= 1.5 * 1024 * 1024) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.85));
+    return blob ? new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" }) : file;
+  } catch {
+    return file; // the server still checks size and type
+  }
+}
+
 /** Sign-up step 2: the email is already verified (signed cookie); collect details and a password. */
-export function SignupForm({ verifiedEmail }: { verifiedEmail: string }) {
+export function SignupForm({ verifiedEmail, relaxed = false }: { verifiedEmail: string; relaxed?: boolean }) {
   const [state, action, pending] = useActionState<FormState, FormData>(createAccount, {});
   // "Change"/"Verify again" are plain buttons (not submit buttons), so pressing Enter in a field
   // always submits "Create account" instead of throwing the student back to the email step.
@@ -29,7 +49,29 @@ export function SignupForm({ verifiedEmail }: { verifiedEmail: string }) {
   const [, startSubmit] = useTransition();
   const restartVerification = () => startLeaving(() => forgetVerifiedEmail());
   const summaryRef = useRef<HTMLDivElement>(null);
-  const e = state.errors ?? {};
+  const [idFile, setIdFile] = useState<File | null>(null);
+  const [idPreview, setIdPreview] = useState<string | null>(null);
+  const [idError, setIdError] = useState<string | null>(null);
+  const [idBusy, setIdBusy] = useState(false);
+  const e = { ...(state.errors ?? {}) };
+  if (idError) e.collegeId = idError;
+  else if (idFile) delete e.collegeId; // a new file was chosen since the last attempt
+
+  async function chooseId(file: File | null) {
+    setIdError(null);
+    if (idPreview) URL.revokeObjectURL(idPreview);
+    setIdPreview(null);
+    if (!file) return setIdFile(null);
+    setIdBusy(true);
+    const ready = await shrinkPhoto(file);
+    setIdBusy(false);
+    if (ready.size > MAX_ID_BYTES) {
+      setIdFile(null);
+      return setIdError("This file is bigger than 4 MB. Take a smaller photo or use a PDF.");
+    }
+    setIdFile(ready);
+    if (ready.type.startsWith("image/")) setIdPreview(URL.createObjectURL(ready));
+  }
 
   const problemFields = Object.keys(FIELD_LABELS).filter((k) => e[k]);
   const hasProblem = problemFields.length > 0 || Boolean(state.message);
@@ -57,9 +99,18 @@ export function SignupForm({ verifiedEmail }: { verifiedEmail: string }) {
       onSubmit={(ev) => {
         ev.preventDefault();
         const data = new FormData(ev.currentTarget);
+        // Send the (possibly shrunk) photo instead of the original.
+        if (idFile) data.set("collegeId", idFile);
+        else data.delete("collegeId");
         startSubmit(() => action(data));
       }}
     >
+      {relaxed && (
+        <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          🛠 <b>Localhost:</b> you can skip fields — empty or wrong ones are filled with test values (password{" "}
+          <code>password123</code> if left empty). This never applies on the live site.
+        </p>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Field label="Full name" htmlFor="fullName" error={e.fullName}>
@@ -118,6 +169,43 @@ export function SignupForm({ verifiedEmail }: { verifiedEmail: string }) {
           </Field>
         </div>
 
+        <div className="sm:col-span-2">
+          <Field
+            label="College ID card"
+            htmlFor="collegeId"
+            error={e.collegeId}
+            hint="A clear photo (or PDF) of your college ID card. Only the print desk can see it."
+          >
+            <label
+              className={`flex cursor-pointer items-center gap-4 rounded-xl border-2 border-dashed bg-stone-50 p-4 hover:border-stone-500 ${
+                e.collegeId ? "border-red-500" : "border-stone-300"
+              }`}
+            >
+              {idPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={idPreview} alt="ID card preview" className="h-20 w-32 rounded-md object-cover" />
+              ) : (
+                <span className="grid h-20 w-32 place-items-center rounded-md bg-white text-3xl">🪪</span>
+              )}
+              <span className="min-w-0 text-sm">
+                <span className="block truncate font-semibold">
+                  {idBusy ? "Preparing photo…" : idFile ? idFile.name : "Choose photo or PDF"}
+                </span>
+                <span className="text-xs text-stone-500">JPG, PNG or PDF · max 4 MB</span>
+              </span>
+              <input
+                id="collegeId"
+                name="collegeId"
+                type="file"
+                accept="image/jpeg,image/png,application/pdf"
+                aria-invalid={invalid("collegeId")}
+                className="sr-only"
+                onChange={(ev) => void chooseId(ev.target.files?.[0] ?? null)}
+              />
+            </label>
+          </Field>
+        </div>
+
         <Field label="Password" htmlFor="password" error={e.password} hint="At least 8 characters.">
           <input id="password" name="password" type="password" autoComplete="new-password" aria-invalid={invalid("password")} className={cls("password")} required />
         </Field>
@@ -144,7 +232,7 @@ export function SignupForm({ verifiedEmail }: { verifiedEmail: string }) {
         </div>
       )}
 
-      <button type="submit" disabled={pending || leaving} className={`${buttonClass} w-full`}>
+      <button type="submit" disabled={pending || leaving || idBusy} className={`${buttonClass} w-full`}>
         {pending ? "Creating account…" : "Create account"}
       </button>
     </form>

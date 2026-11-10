@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { storage } from "@/lib/storage";
+import { readCollegeId } from "@/lib/collegeId";
 
 const TYPES: Record<string, string> = { jpg: "image/jpeg", png: "image/png", pdf: "application/pdf" };
 
@@ -14,7 +14,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ userId:
   if (!user?.collegeIdKey) return Response.json({ error: "not found" }, { status: 404 });
 
   const ext = user.collegeIdKey.split(".").pop() ?? "";
-  const bytes = await storage().get(user.collegeIdKey);
+  let bytes: Buffer;
+  try {
+    bytes = await readCollegeId(user.collegeIdKey);
+  } catch (err) {
+    console.error("[college-id] read failed:", err instanceof Error ? err.message : err);
+    return Response.json({ error: "Couldn't load this ID right now." }, { status: 502 });
+  }
   return new Response(new Uint8Array(bytes), {
     headers: {
       "content-type": TYPES[ext] ?? "application/octet-stream",

@@ -10,6 +10,8 @@ import { createSession, destroySession, hashPassword, isAdminUser, verifyPasswor
 import { issueOtp, verifyOtp } from "@/lib/otp";
 import { domainRestrictionMessage, emailDomainAllowed, parseAllowedDomains } from "@/lib/otpPolicy";
 import { clearVerifiedEmail, getVerifiedEmail } from "@/lib/verifiedEmail";
+import { checkCollegeIdFile, deleteCollegeId, saveCollegeId } from "@/lib/collegeId";
+import { fillTestDefaults, relaxedSignup } from "@/lib/devSignup";
 import { fieldErrors, normalizePrn, passwordSchema, signupSchema, type SignupInput } from "@/lib/validation";
 
 const RESET_COOKIE = "pa_reset";
@@ -48,16 +50,24 @@ const SIGNUP_FIELDS = [
 export async function createAccount(_prev: FormState, formData: FormData): Promise<FormState> {
   // The email comes from the signed cookie set by the verify endpoint, never from the form.
   const verifiedEmail = await getVerifiedEmail();
-  const raw = Object.fromEntries(SIGNUP_FIELDS.map((k) => [k, String(formData.get(k) ?? "")]));
+  let raw = Object.fromEntries(SIGNUP_FIELDS.map((k) => [k, String(formData.get(k) ?? "")]));
   // Never echo passwords back to the form.
   const values = { ...raw, password: "", confirmPassword: "" };
   if (!verifiedEmail) {
-    return { values, message: "Your email verification expired. Please verify your email again." , step: "reverify" };
+    return { values, message: "Your email verification expired. Please verify your email again.", step: "reverify" };
   }
   raw.email = verifiedEmail;
 
+  // Localhost only: fill anything missing with test values so testing is quick.
+  const relaxed = relaxedSignup();
+  if (relaxed) raw = fillTestDefaults(raw);
+
   const parsed = signupSchema.safeParse(raw);
-  if (!parsed.success) return { errors: fieldErrors(parsed.error), values };
+  const errors: Record<string, string> = parsed.success ? {} : fieldErrors(parsed.error);
+  const idFile = await checkCollegeIdFile(formData.get("collegeId"));
+  if (idFile && "error" in idFile) errors.collegeId = idFile.error;
+  else if (!idFile && !relaxed) errors.collegeId = "Add a photo of your college ID card.";
+  if (!parsed.success || Object.keys(errors).length) return { errors, values };
   const data = parsed.data;
 
   const allowed = parseAllowedDomains(env.allowedEmailDomain());
@@ -65,6 +75,17 @@ export async function createAccount(_prev: FormState, formData: FormData): Promi
 
   const taken = await findTakenFields(data);
   if (Object.keys(taken).length) return { errors: taken, values };
+
+  // Save the ID card first (into the admin's Google Drive folder when set up). No account without it.
+  let collegeIdKey: string | null = null;
+  if (idFile && !("error" in idFile)) {
+    try {
+      collegeIdKey = await saveCollegeId(idFile, { prn: data.prn, fullName: data.fullName });
+    } catch (err) {
+      console.error("[signup] saving college ID failed:", err instanceof Error ? err.message : err);
+      return { errors: { collegeId: "We couldn't save your ID card right now. Please try again in a minute." }, values };
+    }
+  }
 
   let user;
   try {
@@ -81,10 +102,13 @@ export async function createAccount(_prev: FormState, formData: FormData): Promi
         className: data.className,
         batch: data.batch,
         address: data.address,
+        collegeIdKey,
         role: isAdminUser({ role: "STUDENT", email: data.email }) ? "ADMIN" : "STUDENT",
       },
     });
   } catch (err) {
+    // Don't leave an orphaned ID card behind.
+    if (collegeIdKey) await deleteCollegeId(collegeIdKey).catch(() => {});
     // Someone registered the same email/PRN/phone a moment ago.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       return { errors: await findTakenFields(data), values };
@@ -100,8 +124,9 @@ export async function createAccount(_prev: FormState, formData: FormData): Promi
     department: user.department,
     appUrl: env.appUrl(),
   });
+  // Logged in straight away — no second login.
   await createSession(user.id);
-  redirect("/signup/college-id");
+  redirect(isAdminUser(user) ? "/admin" : "/dashboard");
 }
 
 async function findTakenFields(d: Pick<SignupInput, "email" | "prn" | "phone">) {
@@ -151,7 +176,7 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
 
   failedLogins.delete(key);
   await createSession(user.id);
-  redirect(isAdminUser(user) ? "/admin" : user.collegeIdKey ? "/print" : "/signup/college-id");
+  redirect(isAdminUser(user) ? "/admin" : "/dashboard");
 }
 
 export async function logout() {

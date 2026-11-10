@@ -4,7 +4,7 @@ import { Alert, PageTitle } from "@/components/ui";
 import { PrintForm } from "./PrintForm";
 
 export default async function PrintPage() {
-  await requireUser({ needCollegeId: true });
+  await requireUser();
   const [settings, printer] = await Promise.all([getSettings(), getPrinterStatus()]);
 
   return (

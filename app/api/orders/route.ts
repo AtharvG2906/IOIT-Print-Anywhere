@@ -14,7 +14,6 @@ const err = (status: number, error: string) => Response.json({ error }, { status
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return err(401, "Please log in again.");
-  if (!user.hasCollegeId && !user.isAdmin) return err(403, "Upload your college ID before printing.");
 
   const parsed = orderInputSchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return err(400, "Invalid order details.");

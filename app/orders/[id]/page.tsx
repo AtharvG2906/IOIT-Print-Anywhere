@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { formatRupees } from "@/lib/pricing";
+import { getPrinterStatus } from "@/lib/settings";
+import { queueInfoFor } from "@/lib/queueStatus";
+import { QueueStatus } from "@/components/QueueStatus";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { Alert, Card, PrintingCode, StatusBadge, buttonClass } from "@/components/ui";
 
@@ -16,6 +19,8 @@ export default async function OrderPage({ params }: PageProps<"/orders/[id]">) {
   if (!order || (order.userId !== user.id && !user.isAdmin)) notFound();
 
   const live = ["PENDING_PAYMENT", "PAID", "PRINTING"].includes(order.status);
+  const [queue, printer] = await Promise.all([queueInfoFor([order.id]), getPrinterStatus()]);
+  const myQueue = queue.get(order.id);
   const timeline = [
     { label: "Paid", at: order.paidAt },
     { label: "Printing started", at: order.printStartedAt },
@@ -35,6 +40,11 @@ export default async function OrderPage({ params }: PageProps<"/orders/[id]">) {
           <>
             <p className="mb-2 text-sm text-stone-500">Your printing code</p>
             <PrintingCode code={order.printingCode} />
+            {myQueue && (
+              <div className="mt-4 text-left">
+                <QueueStatus info={myQueue} printerOnline={printer.online} />
+              </div>
+            )}
             <p className="mt-4 text-sm text-stone-600">
               {order.status === "READY"
                 ? "Your prints are ready! Show this code and your college ID card at the desk."
