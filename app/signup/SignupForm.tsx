@@ -53,6 +53,16 @@ export function SignupForm({ verifiedEmail, relaxed = false }: { verifiedEmail: 
   const [idPreview, setIdPreview] = useState<string | null>(null);
   const [idError, setIdError] = useState<string | null>(null);
   const [idBusy, setIdBusy] = useState(false);
+  // If creating the account takes unusually long, tell the student instead of just spinning.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!pending) return;
+    const t = setTimeout(() => setSlow(true), 15_000);
+    return () => {
+      clearTimeout(t);
+      setSlow(false);
+    };
+  }, [pending]);
   const e = { ...(state.errors ?? {}) };
   if (idError) e.collegeId = idError;
   else if (idFile) delete e.collegeId; // a new file was chosen since the last attempt
@@ -235,6 +245,11 @@ export function SignupForm({ verifiedEmail, relaxed = false }: { verifiedEmail: 
       <button type="submit" disabled={pending || leaving || idBusy} className={`${buttonClass} w-full`}>
         {pending ? "Creating account…" : "Create account"}
       </button>
+      {pending && slow && (
+        <p className="text-center text-sm text-stone-600" role="status">
+          This is taking longer than usual… please wait and don&apos;t refresh the page.
+        </p>
+      )}
     </form>
   );
 }

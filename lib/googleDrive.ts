@@ -17,9 +17,24 @@ export function driveConfigured(): boolean {
 
 let cached: { token: string; expiresAt: number } | null = null;
 
+const TOKEN_TIMEOUT_MS = 10_000;
+const FILE_TIMEOUT_MS = 25_000;
+
+/** fetch with a time limit, so a slow Google never leaves a request waiting forever. */
+async function timedFetch(url: string, init: RequestInit, ms: number, what: string): Promise<Response> {
+  try {
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(ms) });
+  } catch (err) {
+    if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
+      throw new Error(`Google Drive didn't respond in time (${what})`);
+    }
+    throw err;
+  }
+}
+
 async function accessToken(): Promise<string> {
   if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
-  const res = await fetch("https://oauth2.googleapis.com/token", {
+  const res = await timedFetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -28,7 +43,7 @@ async function accessToken(): Promise<string> {
       refresh_token: process.env.GOOGLE_REFRESH_TOKEN ?? "",
       grant_type: "refresh_token",
     }),
-  });
+  }, TOKEN_TIMEOUT_MS, "sign-in");
   const data = (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; error?: string };
   if (!res.ok || !data.access_token) {
     throw new Error(
@@ -60,13 +75,16 @@ export function buildMultipartBody(metadata: object, bytes: Uint8Array, contentT
 export async function uploadToDrive(name: string, bytes: Uint8Array, contentType: string): Promise<string> {
   const boundary = `pa-${crypto.randomUUID()}`;
   const body = buildMultipartBody({ name, parents: [process.env.GOOGLE_DRIVE_FOLDER_ID] }, bytes, contentType, boundary);
-  const res = await fetch(
+  const token = await accessToken();
+  const res = await timedFetch(
     "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id&supportsAllDrives=true",
     {
       method: "POST",
-      headers: { Authorization: `Bearer ${await accessToken()}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
       body: new Uint8Array(body),
     },
+    FILE_TIMEOUT_MS,
+    "upload",
   );
   if (!res.ok) throw await driveError(res, "upload");
   const { id } = (await res.json()) as { id: string };
@@ -74,18 +92,24 @@ export async function uploadToDrive(name: string, bytes: Uint8Array, contentType
 }
 
 export async function downloadFromDrive(fileId: string): Promise<Buffer> {
-  const res = await fetch(
+  const token = await accessToken();
+  const res = await timedFetch(
     `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`,
-    { headers: { Authorization: `Bearer ${await accessToken()}` } },
+    { headers: { Authorization: `Bearer ${token}` } },
+    FILE_TIMEOUT_MS,
+    "download",
   );
   if (!res.ok) throw await driveError(res, "download");
   return Buffer.from(await res.arrayBuffer());
 }
 
 export async function deleteFromDrive(fileId: string): Promise<void> {
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?supportsAllDrives=true`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${await accessToken()}` },
-  });
+  const token = await accessToken();
+  const res = await timedFetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?supportsAllDrives=true`,
+    { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
+    FILE_TIMEOUT_MS,
+    "delete",
+  );
   if (!res.ok && res.status !== 404) throw await driveError(res, "delete");
 }

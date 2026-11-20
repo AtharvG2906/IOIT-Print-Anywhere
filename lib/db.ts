@@ -7,7 +7,12 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 function createClient() {
   // The local `prisma dev` database handles a single connection only; set DATABASE_POOL_MAX=1 for it.
   const max = Number(process.env.DATABASE_POOL_MAX) || undefined;
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL, max });
+  const adapter = new PrismaPg({
+    connectionString: process.env.DATABASE_URL,
+    max,
+    // Fail fast instead of hanging when the database can't be reached.
+    connectionTimeoutMillis: 10_000,
+  });
   return new PrismaClient({ adapter });
 }
 

@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { sendWelcomeEmail } from "@/lib/email";
@@ -10,7 +11,7 @@ import { createSession, destroySession, hashPassword, isAdminUser, verifyPasswor
 import { issueOtp, verifyOtp } from "@/lib/otp";
 import { domainRestrictionMessage, emailDomainAllowed, parseAllowedDomains } from "@/lib/otpPolicy";
 import { clearVerifiedEmail, getVerifiedEmail } from "@/lib/verifiedEmail";
-import { checkCollegeIdFile, deleteCollegeId, saveCollegeId } from "@/lib/collegeId";
+import { checkCollegeIdFile, saveCollegeId } from "@/lib/collegeId";
 import { fillTestDefaults, relaxedSignup } from "@/lib/devSignup";
 import { fieldErrors, normalizePrn, passwordSchema, signupSchema, type SignupInput } from "@/lib/validation";
 
@@ -76,17 +77,9 @@ export async function createAccount(_prev: FormState, formData: FormData): Promi
   const taken = await findTakenFields(data);
   if (Object.keys(taken).length) return { errors: taken, values };
 
-  // Save the ID card first (into the admin's Google Drive folder when set up). No account without it.
-  let collegeIdKey: string | null = null;
-  if (idFile && !("error" in idFile)) {
-    try {
-      collegeIdKey = await saveCollegeId(idFile, { prn: data.prn, fullName: data.fullName });
-    } catch (err) {
-      console.error("[signup] saving college ID failed:", err instanceof Error ? err.message : err);
-      return { errors: { collegeId: "We couldn't save your ID card right now. Please try again in a minute." }, values };
-    }
-  }
-
+  // Create the account and log the student in straight away. The slow parts (ID card upload to
+  // Google Drive, welcome email) run in the background after they're already on the dashboard.
+  const started = Date.now();
   let user;
   try {
     user = await db.user.create({
@@ -102,30 +95,47 @@ export async function createAccount(_prev: FormState, formData: FormData): Promi
         className: data.className,
         batch: data.batch,
         address: data.address,
-        collegeIdKey,
+        collegeIdKey: null,
         role: isAdminUser({ role: "STUDENT", email: data.email }) ? "ADMIN" : "STUDENT",
       },
     });
   } catch (err) {
-    // Don't leave an orphaned ID card behind.
-    if (collegeIdKey) await deleteCollegeId(collegeIdKey).catch(() => {});
     // Someone registered the same email/PRN/phone a moment ago.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       return { errors: await findTakenFields(data), values };
     }
     throw err;
   }
+  console.info(`[signup] account created in ${Date.now() - started} ms`);
 
   await clearVerifiedEmail();
-  await sendWelcomeEmail({
-    to: user.email,
-    name: user.fullName,
-    prn: user.prn,
-    department: user.department,
-    appUrl: env.appUrl(),
-  });
-  // Logged in straight away — no second login.
   await createSession(user.id);
+  console.info(`[signup] logged in after ${Date.now() - started} ms`);
+
+  const newUser = user;
+  after(async () => {
+    if (idFile && !("error" in idFile)) {
+      const t = Date.now();
+      try {
+        const collegeIdKey = await saveCollegeId(idFile, { prn: newUser.prn, fullName: newUser.fullName });
+        await db.user.update({ where: { id: newUser.id }, data: { collegeIdKey } });
+        console.info(`[signup] background ID upload done in ${Date.now() - t} ms`);
+      } catch (err) {
+        console.error(
+          `[signup] background ID upload failed for user ${newUser.id}:`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+    await sendWelcomeEmail({
+      to: newUser.email,
+      name: newUser.fullName,
+      prn: newUser.prn,
+      department: newUser.department,
+      appUrl: env.appUrl(),
+    });
+  });
+
   redirect(isAdminUser(user) ? "/admin" : "/dashboard");
 }
 

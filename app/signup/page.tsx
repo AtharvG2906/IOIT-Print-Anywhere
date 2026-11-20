@@ -9,6 +9,9 @@ import { SignupForm } from "./SignupForm";
 import { VerifyEmailStep } from "./VerifyEmailStep";
 import { Steps } from "@/components/SignupSteps";
 
+// Upper limit for the sign-up server action (and its background ID upload) on Vercel.
+export const maxDuration = 60;
+
 export default async function SignupPage() {
   const current = await getCurrentUser();
   if (current) redirect(homePathFor(current));
