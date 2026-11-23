@@ -6,8 +6,22 @@ function required(name: string): string {
   return value;
 }
 
+/**
+ * The site's public address, used for links in emails. On Vercel, if APP_URL is missing (or still
+ * says localhost) it falls back to the production domain Vercel provides, so emails never link to
+ * a student's own computer.
+ */
+export function resolveAppUrl(e: Record<string, string | undefined> = process.env): string {
+  const set = e.APP_URL?.trim();
+  const vercelDomain = e.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  const isLocal = (u: string) => /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(u);
+  let url = set || "http://localhost:3000";
+  if (e.NODE_ENV === "production" && vercelDomain && (!set || isLocal(set))) url = `https://${vercelDomain}`;
+  return url.replace(/\/+$/, "");
+}
+
 export const env = {
-  appUrl: () => process.env.APP_URL ?? "http://localhost:3000",
+  appUrl: () => resolveAppUrl(),
   sessionSecret: () => required("SESSION_SECRET"),
   /** Key for HMAC-SHA256 hashing of OTP codes and the "verified email" cookie. */
   otpSecret: () => required("OTP_SECRET"),

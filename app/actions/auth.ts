@@ -31,6 +31,7 @@ export type FormState = {
   message?: string;
   step?: string;
   devCode?: string; // localhost only: the OTP, shown on screen because emails aren't really sent
+  done?: string; // sign-up finished: the page to open next (the form does a full page load there)
 };
 
 // ---------- Create account ----------
@@ -136,7 +137,9 @@ export async function createAccount(_prev: FormState, formData: FormData): Promi
     });
   });
 
-  redirect(isAdminUser(user) ? "/admin" : "/dashboard");
+  // A full page load (done by the form) instead of redirect(), so the browser always sends the new
+  // session cookie and the student lands on their dashboard logged in.
+  return { done: isAdminUser(user) ? "/admin" : "/dashboard" };
 }
 
 async function findTakenFields(d: Pick<SignupInput, "email" | "prn" | "phone">) {

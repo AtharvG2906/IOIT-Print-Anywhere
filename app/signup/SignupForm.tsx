@@ -43,6 +43,11 @@ async function shrinkPhoto(file: File): Promise<File> {
 /** Sign-up step 2: the email is already verified (signed cookie); collect details and a password. */
 export function SignupForm({ verifiedEmail, relaxed = false }: { verifiedEmail: string; relaxed?: boolean }) {
   const [state, action, pending] = useActionState<FormState, FormData>(createAccount, {});
+  // Account created: open the dashboard with a full page load so the new login is always picked up.
+  const finished = Boolean(state.done);
+  useEffect(() => {
+    if (state.done) window.location.assign(state.done);
+  }, [state.done]);
   // "Change"/"Verify again" are plain buttons (not submit buttons), so pressing Enter in a field
   // always submits "Create account" instead of throwing the student back to the email step.
   const [leaving, startLeaving] = useTransition();
@@ -242,8 +247,8 @@ export function SignupForm({ verifiedEmail, relaxed = false }: { verifiedEmail: 
         </div>
       )}
 
-      <button type="submit" disabled={pending || leaving || idBusy} className={`${buttonClass} w-full`}>
-        {pending ? "Creating account…" : "Create account"}
+      <button type="submit" disabled={pending || finished || leaving || idBusy} className={`${buttonClass} w-full`}>
+        {finished ? "Opening your dashboard…" : pending ? "Creating account…" : "Create account"}
       </button>
       {pending && slow && (
         <p className="text-center text-sm text-stone-600" role="status">
