@@ -109,7 +109,9 @@ export async function createAccount(_prev: FormState, formData: FormData): Promi
   }
   console.info(`[signup] account created in ${Date.now() - started} ms`);
 
-  await clearVerifiedEmail();
+  // Don't delete the "verified email" cookie here: changing it makes Next re-render /signup, which
+  // would then show step 1 and unmount the form before it can open the dashboard. It expires on its
+  // own after 15 minutes, is cleared on log in / log out, and can't make a second account.
   await createSession(user.id);
   console.info(`[signup] logged in after ${Date.now() - started} ms`);
 
@@ -188,11 +190,13 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
   if (user.blocked) return { message: "This account has been blocked. Please contact the print desk.", values };
 
   failedLogins.delete(key);
+  await clearVerifiedEmail();
   await createSession(user.id);
   redirect(isAdminUser(user) ? "/admin" : "/dashboard");
 }
 
 export async function logout() {
+  await clearVerifiedEmail();
   await destroySession();
   redirect("/");
 }
